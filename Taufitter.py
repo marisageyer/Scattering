@@ -11,6 +11,7 @@ import math
 import pypsr_standalone as psr
 import matplotlib.pyplot as plt
 import numpy as np
+from lmfit.models import LinearModel
 
 import DataReadIn as dri
 
@@ -226,11 +227,18 @@ for i in range(nch):
             data, freqc, freqm = dri.read_data(filepath,i,nbins)
             freqmsMHz.append(freqm)
             freqcsMHz.append(freqc)
-            minbin = np.argmin(data)
-            #rollbin = minbin-10
-            rollbin = 0
-            data = np.roll(data,-rollbin)
-            print "I'm rolling the data by -%d bins" %rollbin
+            if i ==0:
+                peakbin = np.argmax(data)
+                shift = int(halfway -int(peakbin))
+                print 'peak bin at lowest freq channel:%d' %peakbin
+            else:
+                peakbin = peakbin
+                shift = int(halfway - int(peakbin)) 
+                #minbin = np.argmin(data)
+                #rollbin = minbin-10
+                #rollbin = 0
+            data = np.roll(data,shift)
+            print "I'm rolling the data by -%d bins" %shift
     else:
         freqmsMHz = freqsimu
         freqGHz = freqmsMHz/1000.
@@ -292,7 +300,7 @@ for i in range(nch):
     
     obtainedtaus.append(besttau)    
     lmfittausstds.append(taustd)
-    if meth in 'aniso':
+    if meth == "aniso":
         obtainedtaus2.append(besttau2)    
         lmfittausstds2.append(taustd2)    
     bestparamsall.append(bestparams)
@@ -332,7 +340,7 @@ pbs = pulseperiod/nbins
 taussec_highsnr = taus_highsnr*pbs
 lmfitstdssec_highsnr = lmfitstds_highsnr*pbs
 
-if meth in 'aniso':
+if meth == 'aniso':
     taus_highsnr2 = np.array(obtainedtaus2)
     lmfitstds_highsnr2 = np.array(lmfittausstds2)
     taussec_highsnr2 = taus_highsnr2*pbs
@@ -359,7 +367,26 @@ bestpT_highSNR = bestpT
 bestpT_std_highSNR = bestpT_std
 
 """Calculate fits for parameters sigma and mu"""
-"""Shift data based on mu-trend (DM trend?)"""
+"""Fit a DM model to delta mu"""
+delnuarray = [-(1/freqMHz_highsnr[-1]**2-1/freqMHz_highsnr[i]**2) for i in range(npch)] ##in MHz
+delmuarray = [(bestpT_highSNR[1][-1] - bestpT_highSNR[1][i])*pbs for i in range(npch)] ##in seconds
+delmu_stdarray = [(bestpT_std_highSNR[1][-1] - bestpT_std_highSNR[1][i])*pbs for i in range(npch)]
+linmod = LinearModel()
+DM_linpars = linmod.guess(delmuarray, x=delnuarray)
+#	DM_linout  = linmod.fit(delmuarray, DM_linpars, x=delnuarray, weights=1/(np.power(delmu_stdarray,2)))
+DM_linout  = linmod.fit(delmuarray, DM_linpars, x=delnuarray)
+
+DM_CCval = DM_linout.best_values['slope']
+DM_CCvalstd = DM_linout.params['slope'].stderr
+
+DMmodelfit = DM_linout.best_fit ##model gives deltime in seconds (used to shift data)
+
+DMconstant = 4148.808
+#uncertainty in the constant is 0.003 - only affects the Delta DM value in the 9th decimal
+DMval = (DM_CCval/DMconstant)
+DMvalstd = (DM_CCvalstd/DMconstant)
+DMcheck = psr.DM_checker(freqmsMHz,bestpT_highSNR[1]*pbs)
+
 
 pbs = pulseperiod/nbins
 tbs = tsub/nbins
@@ -384,8 +411,9 @@ else:
 
 ##PLOT PROFILES##  
     
-numplots = int(npch)
-
+#numplots = int(npch)
+print "Picking fewer plots"
+numplots = int(npch/30)
 
 """Compute residuals"""
 
@@ -393,18 +421,20 @@ resdata = data_highsnr - model_highsnr
 resnormed = (resdata-resdata.mean())/resdata.std()
 
 
-if taussec_highsnr[0] > 1 or taussec_highsnr2[0] > 1:
+#if taussec_highsnr[0] > 1 or taussec_highsnr2[0] > 1:
+
+if taussec_highsnr[0] > 1:
     taulabel =  taussec_highsnr
     taulabelerr = lmfitstdssec_highsnr
     taustring = 'sec'
-    if meth in 'aniso':
+    if meth == 'aniso':
         taulabel2 = taussec_highsnr2
         taulabelerr2 = lmfitstdssec_highsnr2            
 else:
     taulabel = taussec_highsnr*1000
     taulabelerr = lmfitstdssec_highsnr*1000
     taustring = 'ms'
-    if meth in 'aniso':
+    if meth == 'aniso':
         taulabel2 = taussec_highsnr2*1000
         taulabelerr2 = lmfitstdssec_highsnr2*1000       
     
@@ -418,7 +448,7 @@ for i in range(numplots):
     plt.rc('font', family='serif')
     plt.plot(profilexaxis,data_highsnr[i],'k',alpha = 0.30)
     plt.plot(profilexaxis,model_highsnr[i],prof,lw = 2.0, alpha = 0.7,label=r'$\tau: %.2f \pm %.2f$ %s' %(taulabel[i], taulabelerr[i], taustring))
-    if meth in 'aniso':
+    if meth == 'aniso':
         plt.plot(profilexaxis,model_highsnr[i],prof,lw = 2.0, alpha = 0.0,label=r'$\tau2: %.2f \pm %.2f$ %s' %(taulabel2[i], taulabelerr2[i], taustring))
     plt.title('%s at %.1f MHz' %(pulsar, freqMHz_highsnr[i]))
     plt.ylim(ymax=1.3*np.max(data_highsnr[i]))
@@ -438,21 +468,40 @@ for i in range(numplots):
     plt.xlabel('time (s)',fontsize=14)
     plt.ylabel('residuals',fontsize=14)
 
-##PLOT RESIDUALS HISTOGRAM
+
+##PLOT DM
     plt.subplot(1,4,3)
     #plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
-    plt.hist(resdata[i],facecolor='b',bins=10)
-    plt.title('%s at %.1f MHz' %(pulsar, freqMHz_highsnr[i]))
-    #plt.xticks(fontsize=12)
-    #plt.yticks(fontsize=12)
-    plt.xlabel('time (s)',fontsize=14)
-    plt.ylabel('counts',fontsize=14)
+    plt.errorbar(delmuarray,freqMHz_highsnr, xerr=delmu_stdarray, fmt='k*',alpha=1.0, markersize=9.0,label=r'$\Delta$DM:$%.4f \pm %.4f$ $\rm{pc.cm}^{-3}$' %(DMval,DMvalstd))
+    plt.plot(DMmodelfit,freqMHz_highsnr, 'k-', alpha=0.7)
+    plt.xlabel(r'$\Delta \mu$ (sec)', fontsize =18)
+    plt.annotate('%s' %pulsar,xy=(np.max(freqMHz_highsnr),np.max(taulabel)),xycoords='data',xytext=(0.5,0.7),textcoords='axes fraction',fontsize=14)
+    plt.yticks(fontsize=12)
+    plt.xticks(fontsize=12)
+    plt.title('PSR %s' %pulsar)
+    plt.ylabel(r'$\nu$ (MHz)',fontsize=16)
+    plt.ticklabel_format(style='sci', axis='x',scilimits=(0,0))
+    #plt.tight_layout()
+    plt.legend(fontsize = 12, loc='upper left',numpoints=1)
+
+
+
+##PLOT RESIDUALS HISTOGRAM
+#    plt.subplot(1,4,3)
+#    #plt.rc('text', usetex=True)
+#    plt.rc('font', family='serif')
+#    plt.hist(resdata[i],facecolor='b',bins=10)
+#    plt.title('%s at %.1f MHz' %(pulsar, freqMHz_highsnr[i]))
+#    #plt.xticks(fontsize=12)
+#    #plt.yticks(fontsize=12)
+#    plt.xlabel('time (s)',fontsize=14)
+#    plt.ylabel('counts',fontsize=14)
 
 
     plt.subplot(1,4,4)
     plt.errorbar(freqMHz_highsnr,taulabel,yerr =taulabelerr, fmt = 'k*')
-    if meth in 'aniso':
+    if meth == 'aniso':
         plt.errorbar(freqMHz_highsnr,taulabel2,yerr=taulabelerr2, fmt = 'r^')
     plt.ylabel('tau (%s)' %taustring)
     plt.xlabel('freq (MHz)')
@@ -478,7 +527,7 @@ print eval('print{0}'.format(9))
 #FPtxt = os.path.join(txtpath,txtfile) 
 #
 ##1. Freq, Tau, Tauerr
-#if meth in 'aniso':
+#if meth == 'aniso':
 #    headr = 'Pulsar: %s Nch: %d Nbins: %d \n Freq (MHz), Tau1 (sec), Tau1 Err (sec), Tau2 (sec), Tau2 Err (sec)' %(pulsar,nch,nbins)
 #    np.savetxt(FPtxt,np.column_stack((freqMHz_highsnr,taussec_highsnr,lmfitstdssec_highsnr,taussec_highsnr2,lmfitstdssec_highsnr2)),header=headr)
 #else:
@@ -492,8 +541,8 @@ print eval('print{0}'.format(9))
 #picpath = r'./Output_Plots'
 #if not os.path.exists(picpath):
 #    os.makedirs(picpath)
- 
-#for i in range(nch):
+# 
+#for i in range(numplots):
 #    Summaryplot = '%s_%s_%s_%.2d.png'  % (pulsar,datac,meth, nch-i)
 #    fileoutputtau = os.path.join(picpath,Summaryplot)
 #    plt.savefig(fileoutputtau, dpi=150)
