@@ -1,5 +1,4 @@
-#!/opt/local/bin/python2.7
-# -*- coding: utf-8 -*-
+#!/usr/bin/python2.7
 
 #Created on Mon Jan 25 13:22:33 2016
 
@@ -145,7 +144,7 @@ else:
     
     pulsars = []
     for i in range(nch):
-        if simu in ('aniso','Aniso','ANISO'):
+        if simu == 'aniso':
             pulsar = r'Simul.: $\tau_1 = %.2f$, $\tau_2 = %.2f$ ' %(tausecs[i][0],tausecs[i][1])
             pulsars.append(pulsar)
         else:
@@ -250,15 +249,13 @@ for i in range(nch):
             print "No fitting method was chosen. Will default to an isotropic fitting model. \n Use option -m with 'onedim' or 'aniso' to change."
             result, noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi, corsig = psr.tau_fitter(data,nbins)
             climbval = psr.returnclimb(np.linspace(1,nbins,nbins),bestparams[1],bestparams[0],bestparams[2],besttau,bestparams[3],nbins)
-        elif meth in ('iso','Iso','ISO'):
+        elif meth == 'iso':
             result, noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi, corsig = psr.tau_fitter(data,nbins)
             climbval = psr.returnclimb(np.linspace(1,nbins,nbins),bestparams[1],bestparams[0],bestparams[2],besttau,bestparams[3],nbins)
-        elif meth in ('onedim','1D','Onedim'):
+        elif meth == 'onedim':
             result, noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi, corsig = psr.tau_1D_fitter(data,nbins)
             climbval = psr.returnclimb1D(np.linspace(1,nbins,nbins),bestparams[1],bestparams[0],bestparams[2],besttau,bestparams[3],nbins)
-        elif meth in ('aniso','Aniso','ANISO'):
-            print "############################################"
-            print "############################################"
+        elif meth == 'aniso':
             print "############################################"
             result, noiselessmodel, besttau, taustd, besttau2, taustd2, bestparams, bestparams_std, redchi, corsig = psr.tau_ani_fitter(data,nbins)
             climbval = psr.returnclimb(np.linspace(1,nbins,nbins),bestparams[1],bestparams[0],bestparams[2],besttau,bestparams[3],nbins)
@@ -275,10 +272,10 @@ for i in range(nch):
         if meth is None:
             tempdata = templatefile[:,3]
             noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi = psr.tau_tempfitter(data,nbins,tempdata)
-        elif meth in ('iso','Iso','ISO'):
+        elif meth == 'iso':
             tempdata = templatefile[:,3]
             noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi = psr.tau_tempfitter(data,nbins,tempdata)
-        elif meth in ('onedim','1D','Onedim'):
+        elif meth == 'onedim':
             tempdata = templatefile[:,3]
             noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi = psr.tau_1D_tempfitter(data,nbins,tempdata)                
         else:
@@ -348,7 +345,6 @@ if meth == 'aniso':
 
 climb_highsnr = np.array(climbvals)
     
-    
 freqMHz_highsnr = np.array(freqmsMHz)
 fluxes_highsnr = np.array(comp_fluxes)
 corsigA_highsnr = np.array(cor_sigA)
@@ -393,33 +389,23 @@ tbs = tsub/nbins
     
 """Plotting starts"""
 
-print "Closing all previous plots"
-print ""
 plt.close('all')
 
 if meth in ('onedim','aniso'):
-    print "METH IS ONEDIM"
     prof = 'b--'
     lcol='b'
 if meth in 'iso':
-    print "METH IS ISO"
     prof = 'r-'
     lcol ='r'
-else:
-    print "NO METH SPECIFIED"
- 
 
 ##PLOT PROFILES##  
     
-#numplots = int(npch)
-print "Picking fewer plots"
-numplots = int(npch/30)
+numplots = int(npch)
 
 """Compute residuals"""
 
 resdata = data_highsnr - model_highsnr
 resnormed = (resdata-resdata.mean())/resdata.std()
-
 
 #if taussec_highsnr[0] > 1 or taussec_highsnr2[0] > 1:
 
@@ -437,14 +423,12 @@ else:
     if meth == 'aniso':
         taulabel2 = taussec_highsnr2*1000
         taulabelerr2 = lmfitstdssec_highsnr2*1000       
-    
-
 
 for i in range(numplots):
     figg = plt.figure(i+1,figsize=(14,5))
     figg.subplots_adjust(left = 0.08, right = 0.98, wspace=0.35,hspace=0.35,bottom=0.15)  
-    plt.subplot(1,4,1)
-    #plt.rc('text', usetex=True)
+    #plt.subplot(1,4,i+1)
+    plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     plt.plot(profilexaxis,data_highsnr[i],'k',alpha = 0.30)
     plt.plot(profilexaxis,model_highsnr[i],prof,lw = 2.0, alpha = 0.7,label=r'$\tau: %.2f \pm %.2f$ %s' %(taulabel[i], taulabelerr[i], taustring))
@@ -458,56 +442,6 @@ for i in range(numplots):
     plt.xlabel('time (s)',fontsize=14)
     plt.legend(fontsize=14,numpoints=1)
     plt.ylabel('normalized intensity',fontsize=14)
-           
-    plt.subplot(1,4,2)
-    plt.plot(profilexaxis,resdata[i],'b',alpha = 0.25)
-    plt.title('%s at %.1f MHz' %(pulsar, freqMHz_highsnr[i]))
-    plt.xlim(xmax=pulseperiod)
-    #plt.xticks(fontsize=12)
-    #plt.yticks(fontsize=12)
-    plt.xlabel('time (s)',fontsize=14)
-    plt.ylabel('residuals',fontsize=14)
-
-
-##PLOT DM
-    plt.subplot(1,4,3)
-    #plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
-    plt.errorbar(delmuarray,freqMHz_highsnr, xerr=delmu_stdarray, fmt='k*',alpha=1.0, markersize=9.0,label=r'$\Delta$DM:$%.4f \pm %.4f$ $\rm{pc.cm}^{-3}$' %(DMval,DMvalstd))
-    plt.plot(DMmodelfit,freqMHz_highsnr, 'k-', alpha=0.7)
-    plt.xlabel(r'$\Delta \mu$ (sec)', fontsize =18)
-    plt.annotate('%s' %pulsar,xy=(np.max(freqMHz_highsnr),np.max(taulabel)),xycoords='data',xytext=(0.5,0.7),textcoords='axes fraction',fontsize=14)
-    plt.yticks(fontsize=12)
-    plt.xticks(fontsize=12)
-    plt.title('PSR %s' %pulsar)
-    plt.ylabel(r'$\nu$ (MHz)',fontsize=16)
-    plt.ticklabel_format(style='sci', axis='x',scilimits=(0,0))
-    #plt.tight_layout()
-    plt.legend(fontsize = 12, loc='upper left',numpoints=1)
-
-
-
-##PLOT RESIDUALS HISTOGRAM
-#    plt.subplot(1,4,3)
-#    #plt.rc('text', usetex=True)
-#    plt.rc('font', family='serif')
-#    plt.hist(resdata[i],facecolor='b',bins=10)
-#    plt.title('%s at %.1f MHz' %(pulsar, freqMHz_highsnr[i]))
-#    #plt.xticks(fontsize=12)
-#    #plt.yticks(fontsize=12)
-#    plt.xlabel('time (s)',fontsize=14)
-#    plt.ylabel('counts',fontsize=14)
-
-
-    plt.subplot(1,4,4)
-    plt.errorbar(freqMHz_highsnr,taulabel,yerr =taulabelerr, fmt = 'k*')
-    if meth == 'aniso':
-        plt.errorbar(freqMHz_highsnr,taulabel2,yerr=taulabelerr2, fmt = 'r^')
-    plt.ylabel('tau (%s)' %taustring)
-    plt.xlabel('freq (MHz)')
-    plt.yscale('log')
-    plt.xscale('log')
-    plt.xlim(xmax=1.1*freqMHz_highsnr[-1])
     plt.show()
 
 for i in range(nch):
