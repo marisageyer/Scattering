@@ -39,6 +39,7 @@ args = parser.parse_args()
 """Allocate variable names to the parsed options"""
 filepath = args.filename
 
+print "Expect format as produced by Taufitter.py (3 col: Freq(MHz), Tau(s), TauErr(s))"
 pulsar, data = dri.read_Taufitter(filepath)
 
 
@@ -73,9 +74,7 @@ if 'aniso' in filepath:
     tau2serr = taus2_order_err
 
 
-print "Data has been imported"
-print "Assuming format as produced by Taufitter.py @author: M. Geyer"
-
+print "Txt file imported"
 
 """CALCULATE FITS TO TAUS"""
 powmod = PowerLawModel()

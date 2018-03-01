@@ -176,15 +176,8 @@ if pulseperiod == None:
         pulseind = pulsarLC6list.index(pulsar)
         pulseperiod = pulsarLC6period[pulseind]
     else:
-        print "Pulse period was not provided"
-        
-if pulseperiod == float(0):
-#if pulseperiod == None:
-    print "Using Tsub in header to convert bins to time"
-    pulseperiod = tsub
-#else:
-#   pulseperiod = pulseperiod
-#
+        print "Using Tsub in header to convert bins to time. Note Tsub here is full phase time, corresponding to nbins."
+        pulseperiod = tsub
 
 profilexaxis = np.linspace(0,pulseperiod,nbins)
 
@@ -220,9 +213,7 @@ halfway = nbins/2.
 
 for i in range(nch):
     if simu is None:
-            print "################"
-            print "Channel %d" %i
-            print ""
+            print "\n Channel %d" %i
             data, freqc, freqm = dri.read_data(filepath,i,nbins)
             freqmsMHz.append(freqm)
             freqcsMHz.append(freqc)
@@ -237,7 +228,7 @@ for i in range(nch):
                 #rollbin = minbin-10
                 #rollbin = 0
             data = np.roll(data,shift)
-            print "I'm rolling the data by -%d bins" %shift
+            print "Rolling data by -%d bins" %shift
     else:
         freqmsMHz = freqsimu
         freqGHz = freqmsMHz/1000.
@@ -289,10 +280,11 @@ for i in range(nch):
     comp_flux = psr.find_modelflux(noiselessmodel,nbins)
     comp_SNR_model = psr.find_peaksnr(noiselessmodel,comp_rms)
 
-    print 'SNR (from model): %.2f' % comp_SNR_model
+    print 'Estimated SNR (from model peak and rms): %.2f' % comp_SNR_model
     comp_SNR =  psr.find_peaksnr_smooth(data,comp_rms)
-    print 'SNR (from data): %.2f' % comp_SNR
+    print 'Estimated SNR (from data peak and rms): %.2f' % comp_SNR
 
+    print 'Channel Tau (ms): %.2f \pm %.2f ms' %(besttau,taustd)
     """Append all arrays - to have length of number of frequency channels"""
     
     obtainedtaus.append(besttau)    
@@ -447,30 +439,31 @@ for i in range(numplots):
 for i in range(nch):
     print'Tau (ms): %.2f' %(1000*taussec_highsnr[i])
 
-print9 = 'Tsub = %.5f' %tsub
-print eval('print{0}'.format(9))
+#print9 = 'Tsub = %.5f' %tsub
+#print eval('print{0}'.format(9))
 
-#
-#
 #"""Save txt files"""
-#    
-#txtpath = r'./FitTxtfiles'
-#if not os.path.exists(txtpath):
-#    os.makedirs(txtpath)
-#txtfile = '%s_%s_%s_FreqTau.txt' %(pulsar,datac,meth)
-#FPtxt = os.path.join(txtpath,txtfile) 
-#
-##1. Freq, Tau, Tauerr
-#if meth == 'aniso':
-#    headr = 'Pulsar: %s Nch: %d Nbins: %d \n Freq (MHz), Tau1 (sec), Tau1 Err (sec), Tau2 (sec), Tau2 Err (sec)' %(pulsar,nch,nbins)
-#    np.savetxt(FPtxt,np.column_stack((freqMHz_highsnr,taussec_highsnr,lmfitstdssec_highsnr,taussec_highsnr2,lmfitstdssec_highsnr2)),header=headr)
-#else:
-#    headr = 'Pulsar: %s Nch: %d Nbins: %d \n Freq (MHz), Tau (sec), Tau Err (sec)' %(pulsar,nch,nbins)
-#    np.savetxt(FPtxt,np.column_stack((freqMHz_highsnr,taussec_highsnr,lmfitstdssec_highsnr)),header=headr)
-#
-#print "%s saved in %s" %(txtfile,txtpath)
-#
-#
+
+txtpath = r'./FitTxtfiles'
+if not os.path.exists(txtpath):
+    os.makedirs(txtpath)
+txtfile = '%s_%s_%s_FreqTau.txt' %(pulsar,datac,meth)
+FPtxt = os.path.join(txtpath,txtfile) 
+
+
+#1. Freq, Tau, Tauerr
+if meth == 'aniso':
+    headr = 'Pulsar: %s Nch: %d Nbins: %d \n Freq (MHz), Tau1 (sec), Tau1 Err (sec), Tau2 (sec), Tau2 Err (sec)' %(pulsar,nch,nbins)
+    np.savetxt(FPtxt,np.column_stack((freqMHz_highsnr,taussec_highsnr,lmfitstdssec_highsnr,taussec_highsnr2,lmfitstdssec_highsnr2)),header=headr)
+else:
+    headr = 'Pulsar: %s Nch: %d Nbins: %d \n Freq (MHz), Tau (sec), Tau Err (sec)' %(pulsar,nch,nbins)
+    np.savetxt(FPtxt,np.column_stack((freqMHz_highsnr,taussec_highsnr,lmfitstdssec_highsnr)),header=headr)
+
+print "%s saved in %s" %(txtfile,txtpath)
+
+
+
+
 #"""Create folder to save plots to"""
 #picpath = r'./Output_Plots'
 #if not os.path.exists(picpath):
