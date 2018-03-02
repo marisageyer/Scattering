@@ -20,7 +20,6 @@ import DataReadIn as dri
 #rc('font',**{'family':'serif','serif':['Palatino']})
 #rc('text', usetex=False)
 
-#"""Read and print header information"""
 """Define options to the script"""
 parser = argparse.ArgumentParser()
 parser.add_argument('-f','--filename',
@@ -30,9 +29,9 @@ parser.add_argument('-p','--period',type=float,
 parser.add_argument('-s','--simulate',
                     help="Choosing this option leads to simulated data. For broadening function: choose between 'onedim', 'iso', 'aniso'.")                    
 parser.add_argument('-m','--method',
-                    help="Choosing method to fit data or simulation. Choose between 'onedim', 'iso', 'aniso','postfold', 'isoplusonedim'")                   
+                    help="Choosing method to fit data or simulation. Choose between 'onedim' and 'iso'")                   
 parser.add_argument('-dc','--datacycle',
-                    help="The type of data. Choose to label filenames. I typically use comm., census, cycle5. Only used in creating filenames.")
+                    help="The type of data. Used to label filenames.")
 parser.add_argument('-t','--template',
                     help="filepath to txt file, containing a high frequency EPN profile. It will use the fixed with of this profile as the Guassian intrinsic template.")
 args = parser.parse_args()
@@ -64,7 +63,7 @@ if simu is None:
 else:
     print "\n Simulating data \n"
     print(" \n 1. The %s broadening function" %simu)
-    if simu in ('iso','ISO', 'Iso', 'onedim','1D','Onedim'):
+    if simu in ('iso','onedim', 'aniso'):
         while True:
             try:
                 taudivP = raw_input("Express max. tau as a fraction of the pulseperiod: ")
@@ -120,8 +119,6 @@ else:
 
     while True:
         try:            
-#            nbins = raw_input("Choose number of bins per pulse period: ")
-#            nbins = int(nbins)
             snr = raw_input("Choose peak SNR: ")
             snr = int(snr)
         except ValueError:
@@ -134,7 +131,7 @@ else:
     freqsimu = np.arange(freqlow,freqhigh+incr,incr)
     nch = len(freqsimu)
     propconst = taudivP*pulseperiod*(freqlow/1000.)**4
-    propconst = np.array([propconst])
+    propconst = np.array(propconst)
     
     tausecs = []
     for i in range(len(propconst)):
@@ -159,30 +156,17 @@ else:
         print eval('print{0}'.format(k))
 
 
-#Find pulseperiod from list if it wasn't parsed
-
-pulsarBnamelist = ['B0037+56','B0114+58','B0540+23','B0611+22','B0740-28','B1848+12','B1907+10','B1911-04','B1915+13','B1920+21','B1933+16','B2255+58','B2303+30']
-pulsarnamelist = ['J0040+5716','J0117+5914','J0543+2329','J0614+2229', 'J0742-2822','J1851+1259','J1909+1102','J1913-0440','J1917+1353','J1922+2110','J1935+1616','J2257+5909','J2305+3100']
-pulsarperiodlist = [1.118225, 0.101439, 0.245975, 0.33496, 0.166762, 1.205303, 0.283641, 0.825936, 0.194631, 1.077924, 0.358738, 0.368246, 1.575886]
-
-pulsarLC6list = ['J1939+2134','1939+2134','J2113+4644','2113+4644','J2219+4754','2219+4754']
-pulsarLC6period = [0.00155780655654431,0.00155780655654431,1.014684793189,1.014684793189,0.5384688219194,0.5384688219194]
+## Define time axis, and time/bins conversions
 
 if pulseperiod == None: 
-    if pulsar in pulsarnamelist:
-   	pulseind = pulsarnamelist.index(pulsar)
-   	pulseperiod = pulsarperiodlist[pulseind]
-    elif pulsar in pulsarLC6list:
-        pulseind = pulsarLC6list.index(pulsar)
-        pulseperiod = pulsarLC6period[pulseind]
-    else:
-        print "Using Tsub in header to convert bins to time. Note Tsub here is full phase time, corresponding to nbins."
-        pulseperiod = tsub
+    print "Using Tsub in header to convert bins to time. Note Tsub here is full phase time, corresponding to nbins."
+    pulseperiod = tsub
 
 profilexaxis = np.linspace(0,pulseperiod,nbins)
+pbs = pulseperiod/nbins
+tbs = tsub/nbins
 
-
-#Fit profile using tau_fitter
+# Prepare to fit profile using tau_fitter
 
 obtainedtaus = []
 lmfittausstds = []
@@ -206,38 +190,33 @@ climbvals =[]
 
 
 
-
-#trainlength = 4
-
 halfway = nbins/2.
 
 for i in range(nch):
     if simu is None:
             print "\n Channel %d" %i
+	    # read in data 
             data, freqc, freqm = dri.read_data(filepath,i,nbins)
             freqmsMHz.append(freqm)
             freqcsMHz.append(freqc)
-            if i ==0:
+            # roll the data of lowest freq channel to middle of bins 
+	    if i ==0:
                 peakbin = np.argmax(data)
                 shift = int(halfway -int(peakbin))
                 print 'peak bin at lowest freq channel:%d' %peakbin
             else:
                 peakbin = peakbin
                 shift = int(halfway - int(peakbin)) 
-                #minbin = np.argmin(data)
-                #rollbin = minbin-10
-                #rollbin = 0
             data = np.roll(data,shift)
             print "Rolling data by -%d bins" %shift
     else:
         freqmsMHz = freqsimu
-        freqGHz = freqmsMHz/1000.
         data = psr.simulate(pulseperiod,tausecs[i],dutycycle,-1.6,freqGHz[i],freqlow/1000.,nbins,snr,simu)
     comp_rms = psr.find_rms(data,nbins)
    
     if temp is None: 
         if meth is None:
-            print "No fitting method was chosen. Will default to an isotropic fitting model. \n Use option -m with 'onedim' or 'aniso' to change."
+            print "No fitting method was chosen. Will default to an isotropic fitting model. \n Use option -m with 'onedim' to change."
             result, noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi, corsig = psr.tau_fitter(data,nbins)
             climbval = psr.returnclimb(np.linspace(1,nbins,nbins),bestparams[1],bestparams[0],bestparams[2],besttau,bestparams[3],nbins)
         elif meth == 'iso':
@@ -246,18 +225,13 @@ for i in range(nch):
         elif meth == 'onedim':
             result, noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi, corsig = psr.tau_1D_fitter(data,nbins)
             climbval = psr.returnclimb1D(np.linspace(1,nbins,nbins),bestparams[1],bestparams[0],bestparams[2],besttau,bestparams[3],nbins)
-        elif meth == 'aniso':
-            print "############################################"
-            result, noiselessmodel, besttau, taustd, besttau2, taustd2, bestparams, bestparams_std, redchi, corsig = psr.tau_ani_fitter(data,nbins)
-            climbval = psr.returnclimb(np.linspace(1,nbins,nbins),bestparams[1],bestparams[0],bestparams[2],besttau,bestparams[3],nbins)
-            print "fix climbval to Aniso version!!"
-        elif meth in ('fix'):
-              print "This uses fixed width values, as given by fixval array"
-              fixvals = np.array([ 735.96503772,  570.80448298,  283.9382534 ,  220.03587608,
-        157.5615805 ,  142.65554165,  106.30809045,  114.00090536])
-              noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi = psr.tau_fitter_fix1D(data,nbins,fixvals[i])
+        #elif meth in ('fix'):
+        #     print "This uses fixed width values, as given by fixval array"
+        #     fixvals = np.array([ 735.96503772,  570.80448298,  283.9382534 ,  220.03587608,
+        #157.5615805 ,  142.65554165,  106.30809045,  114.00090536])
+        #      noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi = psr.tau_fitter_fix1D(data,nbins,fixvals[i])
         else:
-             print "Incorrect fitting method. Choose from iso, onedim, aniso, fix"
+             print "Incorrect fitting method. Choose from iso or onedim"
     else:
         templatefile = np.loadtxt(temp)
         if meth is None:
@@ -289,15 +263,14 @@ for i in range(nch):
     
     obtainedtaus.append(besttau)    
     lmfittausstds.append(taustd)
-    if meth == "aniso":
-        obtainedtaus2.append(besttau2)    
-        lmfittausstds2.append(taustd2)    
     bestparamsall.append(bestparams)
     bestparams_stdall.append(bestparams_std)
+    
     redchis.append(redchi)
     correls.append(corsig)          
     noiselessmodels.append(noiselessmodel)
     results.append(result)
+    
     comp_rmss.append(comp_rms)
     comp_fluxes.append(comp_flux)
     comp_SNRs.append(comp_SNR)
@@ -313,9 +286,9 @@ for i in range(len(correls)):
         cor_sigA[i] = 0
     elif correls[i] is not None:
         cor_sigA[i] = correls[i]['A']
-#        cor_sigA.append(csigA)
             
 ## insert a SNR cutoff here later if want to.
+## have removed it for now
 
 print "Using no SNR cutoff" 
 
@@ -325,15 +298,8 @@ model_highsnr = np.array(noiselessmodels)
 taus_highsnr = np.array(obtainedtaus)
 lmfitstds_highsnr = np.array(lmfittausstds)
 
-pbs = pulseperiod/nbins
 taussec_highsnr = taus_highsnr*pbs
 lmfitstdssec_highsnr = lmfitstds_highsnr*pbs
-
-if meth == 'aniso':
-    taus_highsnr2 = np.array(obtainedtaus2)
-    lmfitstds_highsnr2 = np.array(lmfittausstds2)
-    taussec_highsnr2 = taus_highsnr2*pbs
-    lmfitstdssec_highsnr2 = lmfitstds_highsnr2*pbs
 
 climb_highsnr = np.array(climbvals)
     
@@ -355,6 +321,7 @@ bestpT_highSNR = bestpT
 bestpT_std_highSNR = bestpT_std
 
 """Calculate fits for parameters sigma and mu"""
+
 """Fit a DM model to delta mu"""
 delnuarray = [-(1/freqMHz_highsnr[-1]**2-1/freqMHz_highsnr[i]**2) for i in range(npch)] ##in MHz
 delmuarray = [(bestpT_highSNR[1][-1] - bestpT_highSNR[1][i])*pbs for i in range(npch)] ##in seconds
@@ -375,66 +342,61 @@ DMval = (DM_CCval/DMconstant)
 DMvalstd = (DM_CCvalstd/DMconstant)
 DMcheck = psr.DM_checker(freqmsMHz,bestpT_highSNR[1]*pbs)
 
-
-pbs = pulseperiod/nbins
-tbs = tsub/nbins
     
 """Plotting starts"""
 
 plt.close('all')
 
-if meth in ('onedim','aniso'):
+#plot onedim in blue dashed
+#else plot in red
+if meth == 'onedim':
     prof = 'b--'
     lcol='b'
-if meth in 'iso':
+else:
     prof = 'r-'
     lcol ='r'
 
 ##PLOT PROFILES##  
     
-numplots = int(npch)
+numplots = int(np.ceil(npch/8.))
 
 """Compute residuals"""
 
 resdata = data_highsnr - model_highsnr
 resnormed = (resdata-resdata.mean())/resdata.std()
 
-#if taussec_highsnr[0] > 1 or taussec_highsnr2[0] > 1:
-
+"""Plot 1: Pulse profiles and fits"""
 if taussec_highsnr[0] > 1:
     taulabel =  taussec_highsnr
     taulabelerr = lmfitstdssec_highsnr
     taustring = 'sec'
-    if meth == 'aniso':
-        taulabel2 = taussec_highsnr2
-        taulabelerr2 = lmfitstdssec_highsnr2            
 else:
     taulabel = taussec_highsnr*1000
     taulabelerr = lmfitstdssec_highsnr*1000
     taustring = 'ms'
-    if meth == 'aniso':
-        taulabel2 = taussec_highsnr2*1000
-        taulabelerr2 = lmfitstdssec_highsnr2*1000       
 
-for i in range(numplots):
-    figg = plt.figure(i+1,figsize=(14,5))
-    figg.subplots_adjust(left = 0.08, right = 0.98, wspace=0.35,hspace=0.35,bottom=0.15)  
-    #plt.subplot(1,4,i+1)
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
-    plt.plot(profilexaxis,data_highsnr[i],'k',alpha = 0.30)
-    plt.plot(profilexaxis,model_highsnr[i],prof,lw = 2.0, alpha = 0.7,label=r'$\tau: %.2f \pm %.2f$ %s' %(taulabel[i], taulabelerr[i], taustring))
-    if meth == 'aniso':
-        plt.plot(profilexaxis,model_highsnr[i],prof,lw = 2.0, alpha = 0.0,label=r'$\tau2: %.2f \pm %.2f$ %s' %(taulabel2[i], taulabelerr2[i], taustring))
-    plt.title('%s at %.1f MHz' %(pulsar, freqMHz_highsnr[i]))
-    plt.ylim(ymax=1.3*np.max(data_highsnr[i]))
-    plt.xlim(xmax=pulseperiod)
-    plt.xticks(fontsize=12)
-    plt.yticks(fontsize=12)
-    plt.xlabel('time (s)',fontsize=14)
-    plt.legend(fontsize=14,numpoints=1)
-    plt.ylabel('normalized intensity',fontsize=14)
-    plt.show()
+for k in range(numplots):
+    j = 8*k
+    figg = plt.figure(k+1,figsize=(14,8))
+    for i in range(8):
+    		figg.subplots_adjust(left = 0.08, right = 0.98, wspace=0.35,hspace=0.35,bottom=0.15)  
+    		#plt.rc('text', usetex=True)
+    		#plt.rc('font', family='serif')              
+    		plt.subplot(2,4,i+1)
+    		plt.plot(profilexaxis,data_highsnr[j+i],'k',alpha = 0.30)
+    		plt.plot(profilexaxis,model_highsnr[j+i],prof,lw = 2.0, alpha
+                        = 0.7,label=r'$\tau: %.2f \pm %.2f$ %s'
+                        %(taulabel[j+i], taulabelerr[j+i], taustring))
+    		plt.title('%s at %.1f MHz' %(pulsar, freqMHz_highsnr[j+i]))
+    		plt.ylim(ymax=1.3*np.max(data_highsnr[j+i]))
+    		plt.xlim(xmax=pulseperiod)
+    		plt.xticks(fontsize=12)
+    		plt.yticks(fontsize=12)
+    		plt.xlabel('time (s)',fontsize=14)
+    		plt.legend(fontsize=12,numpoints=1)
+    		plt.ylabel('normalized intensity',fontsize=14)
+plt.show()
+
 
 for i in range(nch):
     print'Tau (ms): %.2f' %(1000*taussec_highsnr[i])
@@ -452,16 +414,10 @@ FPtxt = os.path.join(txtpath,txtfile)
 
 
 #1. Freq, Tau, Tauerr
-if meth == 'aniso':
-    headr = 'Pulsar: %s Nch: %d Nbins: %d \n Freq (MHz), Tau1 (sec), Tau1 Err (sec), Tau2 (sec), Tau2 Err (sec)' %(pulsar,nch,nbins)
-    np.savetxt(FPtxt,np.column_stack((freqMHz_highsnr,taussec_highsnr,lmfitstdssec_highsnr,taussec_highsnr2,lmfitstdssec_highsnr2)),header=headr)
-else:
-    headr = 'Pulsar: %s Nch: %d Nbins: %d \n Freq (MHz), Tau (sec), Tau Err (sec)' %(pulsar,nch,nbins)
-    np.savetxt(FPtxt,np.column_stack((freqMHz_highsnr,taussec_highsnr,lmfitstdssec_highsnr)),header=headr)
+headr = 'Pulsar: %s Nch: %d Nbins: %d \n Freq (MHz), Tau (sec), Tau Err (sec)' %(pulsar,nch,nbins)
+np.savetxt(FPtxt,np.column_stack((freqMHz_highsnr,taussec_highsnr,lmfitstdssec_highsnr)),header=headr)
 
 print "%s saved in %s" %(txtfile,txtpath)
-
-
 
 
 #"""Create folder to save plots to"""
