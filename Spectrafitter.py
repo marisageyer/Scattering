@@ -1,6 +1,4 @@
-#!/usr/bin/python
-
-
+#!/Users/mgeyer/anaconda2/bin/python
 
 # -*- coding: utf-8 -*-
 
@@ -28,23 +26,26 @@ rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 #rc('font',**{'family':'serif','serif':['Palatino']})
 rc('text', usetex=True)
 
-#"""Read and print header information"""
 """Define options to the script"""
 parser = argparse.ArgumentParser()
 parser.add_argument('-f','--filename',
                     help="Provide the pathway to the data file, containing first column of frequencies second column of tau values")
-
+parser.add_argument('-dl','--datalabel', type=str, help="Optional. Provide extra label for saved output plot.")
 args = parser.parse_args()
 
 """Allocate variable names to the parsed options"""
 filepath = args.filename
+dlab=args.datalabel
 
 print "Expect format as produced by Taufitter.py (3 col: Freq(MHz), Tau(s), TauErr(s))"
-pulsar, data = dri.read_Taufitter(filepath)
+pulsar, nch, meth, data = dri.read_Taufitter(filepath)
 
 
 freqMHz = data[:,0]
 freqGHz = data[:,0]/1000.
+
+print np.shape(data)
+
 taus = data[:,1] 
 if np.shape(data)[1] >= 3:
     tauserr = data[:,2]
@@ -76,12 +77,26 @@ if 'aniso' in filepath:
 
 print "Txt file imported"
 
+"""DROP DATA ASSOCIATED WITH ZERO TAU ERRORS (i.e. zeros in the last column)"""
+#print data
+
+if np.shape(data)[1]>= 3:
+    row_col2iszero = np.equal(data[:,2], 0)
+    data = data[~row_col2iszero]
+    taus = data[:,1]
+    tauserr = data[:,2]
+    freqMHz = data[:,0]
+    freqGHz = freqMHz/1000
+
+print data
+#print freqMHz[0]
+
 """CALCULATE FITS TO TAUS"""
 powmod = PowerLawModel()
 powparstau = powmod.guess(taus,x=freqGHz)
 
 if np.shape(data)[1] >= 3:
-    powout = powmod.fit(taus,powparstau,x=freqGHz,weights=1/(tauserr))
+    powout = powmod.fit(taus,powparstau,x=freqGHz,weights=1/(tauserr)**2)
 else:
     powout = powmod.fit(taus,powparstau,x=freqGHz,weights=1)
 print(fit_report(powout.params))    
@@ -93,7 +108,7 @@ amperr = powout.params['amplitude'].stderr
 
 if 'aniso' in filepath:
     powparstau2 = powmod.guess(tau2s,x=freqGHz)
-    powout2 = powmod.fit(tau2s,powparstau2,x=freqGHz,weights=1/(tau2serr))
+    powout2 = powmod.fit(tau2s,powparstau2,x=freqGHz,weights=1/(tau2serr)**2)
 
     print(fit_report(powout2.params))    
     fit2 = powout2.best_fit    
@@ -105,7 +120,7 @@ if 'aniso' in filepath:
     taugeo = np.sqrt(taus*tau2s)
     taugeoerr = np.sqrt(tauserr*tau2serr)
     powparstauG = powmod.guess(taugeo,x=freqGHz)
-    powoutG = powmod.fit(taugeo,powparstauG,x=freqGHz,weights=1/(taugeoerr))
+    powoutG = powmod.fit(taugeo,powparstauG,x=freqGHz,weights=1/(taugeoerr)**2)
 
     print(fit_report(powoutG.params))    
     fitG = powoutG.best_fit    
@@ -124,7 +139,7 @@ plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 plt.title('PSR %s'%pulsar)
 if np.shape(data)[1] >= 3:
-    plt.errorbar(freqMHz,taus,yerr=tauserr,fmt='k*',markersize=9.0,capthick=2,linewidth=1.5,label=r'$\alpha = %.1f \pm %.1f$' %(alpha,alphaerr))
+    plt.errorbar(freqMHz,taus,yerr=tauserr,fmt='k*',markersize=9.0,capthick=2,linewidth=1.5,label=r'$\alpha= %.2f \pm %.2f$' %(alpha,alphaerr))
 else:
     plt.plot(freqMHz,taus,'k*',markersize=9.0,linewidth=1.5,label=r'$\alpha = %.1f \pm %.1f$' %(alpha,alphaerr))
 plt.plot(freqMHz,fit,'k--',linewidth=1.5)
@@ -146,14 +161,12 @@ plt.xlim(xmin = 0.95*freqMHz[0],xmax=1.05*freqMHz[-1])
 plt.gcf().subplots_adjust(bottom=0.15)
 
 
-
-
 """Create folder to save to"""
 picpath = r'./SpectraPlots'
 if not os.path.exists(picpath):
     os.makedirs(picpath)
 
-Spectraplot = '%s_tauspectrum.png'  % pulsar
+Spectraplot = '%s_%s_Nch%.2d_%.0fMHz_%s_tauspectrum.png' %(pulsar,meth,nch,freqMHz[0],dlab)
 fileoutputtau = os.path.join(picpath,Spectraplot)
 plt.savefig(fileoutputtau, dpi=150)
 print 'Saved %s in %s' %(Spectraplot,picpath)

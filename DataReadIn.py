@@ -60,7 +60,13 @@ def read_Taufitter(filename):
     nch = int(h0_lines[4])
     nbins = int(h0_lines[6])
     data = np.loadtxt(filename,skiprows=2)
-    return pulsar,data
+    if 'onedim' in filename:
+        meth = 'onedim'
+    elif 'iso' in filename: 
+        meth = 'iso'
+    else:
+        meth = 'unknown'
+    return pulsar, nch, meth, data
     
     
 def read_data(filepath, profilenumber, nbins):

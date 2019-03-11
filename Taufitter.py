@@ -1,5 +1,4 @@
-#!/usr/bin/python2.7
-
+#!/Users/mgeyer/anaconda2/bin/python
 #Created on Mon Jan 25 13:22:33 2016
 
 #@author: marisa
@@ -7,6 +6,7 @@
 import argparse
 import os, sys
 import math
+import subprocess
 import pypsr_standalone as psr
 import matplotlib.pyplot as plt
 import numpy as np
@@ -33,8 +33,7 @@ parser.add_argument('-m','--method',
 parser.add_argument('-dc','--datacycle',
                     help="The type of data. Used to label filenames.")
 parser.add_argument('-t','--template',
-                    help="filepath to txt file, containing a high frequency EPN
-                    profile. It will use the fixed width of this profile as the Guassian intrinsic template.")
+                    help="filepath to txt file, containing a high frequency EPN profile. It will use the fixed width of this profile as the Guassian intrinsic template.")
 args = parser.parse_args()
 
 """Allocate variable names to the parsed options"""
@@ -160,8 +159,23 @@ else:
 ## Define time axis, and time/bins conversions
 
 if pulseperiod == None: 
-    print "Using Tsub in header to convert bins to time. Note Tsub here is full phase time, corresponding to nbins."
-    pulseperiod = tsub
+    print "Calling prscat subprocess to obtain pulsar period"
+
+    command = ['psrcat','-nohead', '-o', 'short', '-c', 'JNAME p0 DM', pulsar]
+    pulsar_psrcat = subprocess.Popen(command, shell=False, cwd='.', stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    (stdoutdata, stderrdata) = pulsar_psrcat.communicate()
+    return_code = pulsar_psrcat.returncode
+
+    if return_code != 0:
+        raise RuntimeError('Problems with psrcat: %s') % stdoutdata
+    elif ' not in catalogue' in stdoutdata:
+        raise RuntimeError('Pulsar not found in psrcat.')
+
+    pname = stdoutdata.split()[1]
+    pulseperiod = float(stdoutdata.split()[2])
+    dm = float(stdoutdata.split()[3])
+    print "%s. Period: %.3f sec, DM: %.3f pc cm^-3"   %(pname,pulseperiod,dm)
+
 
 profilexaxis = np.linspace(0,pulseperiod,nbins)
 pbs = pulseperiod/nbins
@@ -226,11 +240,6 @@ for i in range(nch):
         elif meth == 'onedim':
             result, noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi, corsig = psr.tau_1D_fitter(data,nbins)
             climbval = psr.returnclimb1D(np.linspace(1,nbins,nbins),bestparams[1],bestparams[0],bestparams[2],besttau,bestparams[3],nbins)
-        #elif meth in ('fix'):
-        #     print "This uses fixed width values, as given by fixval array"
-        #     fixvals = np.array([ 735.96503772,  570.80448298,  283.9382534 ,  220.03587608,
-        #157.5615805 ,  142.65554165,  106.30809045,  114.00090536])
-        #      noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi = psr.tau_fitter_fix1D(data,nbins,fixvals[i])
         else:
              print "Incorrect fitting method. Choose from iso or onedim"
     else:
@@ -245,7 +254,7 @@ for i in range(nch):
             tempdata = templatefile[:,3]
             noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi = psr.tau_1D_tempfitter(data,nbins,tempdata)                
         else:
-           print "Incorrect fitting method. Choose from iso or onedim or multi (for analytical double peak)"
+           print "Incorrect fitting method. Choose from iso or onedim"
     
 
 
@@ -259,14 +268,14 @@ for i in range(nch):
     comp_SNR =  psr.find_peaksnr_smooth(data,comp_rms)
     print 'Estimated SNR (from data peak and rms): %.2f' % comp_SNR
 
-    print 'Channel Tau (ms): %.2f \pm %.2f ms' %(besttau,taustd)
+    print 'Channel Tau (ms): %.2f \pm %.2f ms' %(besttau*pbs*1000,taustd*pbs*1000)
     """Append all arrays - to have length of number of frequency channels"""
     
     obtainedtaus.append(besttau)    
     lmfittausstds.append(taustd)
     bestparamsall.append(bestparams)
     bestparams_stdall.append(bestparams_std)
-    
+
     redchis.append(redchi)
     correls.append(corsig)          
     noiselessmodels.append(noiselessmodel)
@@ -288,11 +297,6 @@ for i in range(len(correls)):
     elif correls[i] is not None:
         cor_sigA[i] = correls[i]['A']
             
-## insert a SNR cutoff here later if want to.
-## have removed it for now
-
-print "Using no SNR cutoff" 
-
 data_highsnr =np.array(datas)
 model_highsnr = np.array(noiselessmodels)
 
@@ -379,10 +383,14 @@ else:
 for k in range(numplots):
     j = 8*k
     figg = plt.figure(k+1,figsize=(14,8))
-    for i in range(8):
+    if npch < 8:
+        run = npch
+    else:
+        run = 8
+    for i in range(run):
     		figg.subplots_adjust(left = 0.08, right = 0.98, wspace=0.35,hspace=0.35,bottom=0.15)  
     		plt.rc('text', usetex=True)
-    		plt.rc('font', family='serif')              
+    		plt.rc('font', family='serif')               
     		plt.subplot(2,4,i+1)
     		plt.plot(profilexaxis,data_highsnr[j+i],'k',alpha = 0.30)
     		plt.plot(profilexaxis,model_highsnr[j+i],prof,lw = 2.0, alpha
@@ -396,8 +404,20 @@ for k in range(numplots):
     		plt.xlabel('time (s)',fontsize=14)
     		plt.legend(fontsize=12,numpoints=1)
     		plt.ylabel('normalized intensity',fontsize=14)
-plt.show()
+#    plt.show()
 
+
+#"""Create folder to save plots to"""
+picpath = r'./Output_Plots'
+if not os.path.exists(picpath):
+    os.makedirs(picpath)
+ 
+for i in range(numplots):
+    Summaryplot = '%s_%s_%.0fMHz_%s_Nch%.2d.png' %(pulsar,datac,freqMHz_highsnr[0],meth, nch-i)
+    fileoutputtau = os.path.join(picpath,Summaryplot)
+    plt.savefig(fileoutputtau, dpi=150)
+    print 'Saved %s in %s' %(Summaryplot,picpath)
+    plt.close()
 
 for i in range(nch):
     print'Tau (ms): %.2f' %(1000*taussec_highsnr[i])
@@ -410,7 +430,7 @@ for i in range(nch):
 txtpath = r'./FitTxtfiles'
 if not os.path.exists(txtpath):
     os.makedirs(txtpath)
-txtfile = '%s_%s_%s_FreqTau.txt' %(pulsar,datac,meth)
+txtfile = '%s_%s_%.0fMHz_%s_Nch%.2d_FreqTau.txt' %(pulsar,datac,freqMHz_highsnr[0],meth,nch)
 FPtxt = os.path.join(txtpath,txtfile) 
 
 
@@ -421,11 +441,11 @@ np.savetxt(FPtxt,np.column_stack((freqMHz_highsnr,taussec_highsnr,lmfitstdssec_h
 print "%s saved in %s" %(txtfile,txtpath)
 
 
-#"""Create folder to save plots to"""
+##"""Create folder to save plots to"""
 #picpath = r'./Output_Plots'
 #if not os.path.exists(picpath):
 #    os.makedirs(picpath)
-# 
+ 
 #for i in range(numplots):
 #    Summaryplot = '%s_%s_%s_%.2d.png'  % (pulsar,datac,meth, nch-i)
 #    fileoutputtau = os.path.join(picpath,Summaryplot)
