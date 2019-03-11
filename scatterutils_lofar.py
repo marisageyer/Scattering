@@ -325,6 +325,8 @@ def tau_fitter(data,nbins, verbose=True):
     noiselessmodel = result.best_fit
     besttau = result.best_values['tau']
     taustd = result.params['tau'].stderr  ##estimated 1 sigma error
+    if taustd == None:
+       taustd = 0
 
     bestsig = result.best_values['sigma']
     bestmu = result.best_values['mu']
@@ -373,7 +375,8 @@ def tau_1D_fitter(data,nbins):
     noiselessmodel = result.best_fit
     besttau = result.best_values['tau1']
     taustd = result.params['tau1'].stderr  ##estimated 1 sigma error
-
+    if taustd == None:
+       taustd = 0
     bestsig = result.best_values['sigma']
     bestmu = result.best_values['mu']
     bestA = result.best_values['A']
@@ -477,7 +480,6 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 print 'Estimated SNR (from model peak and data rms): %.2f' % comp_SNR_model
             comp_SNR =  find_peaksnr_smooth(data,comp_rms)
             print 'Estimated SNR (from data peak and rms): %.2f' % comp_SNR
-
             print 'Channel Tau (ms): %.2f \pm %.2f ms' %(besttau,taustd)
             
            
