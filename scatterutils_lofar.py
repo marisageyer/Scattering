@@ -513,6 +513,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 zero_ch.append(i)
         
         print"--------------------------------------------------------"
+
         if zero_ch:
             print "\n"
             print "%d channels have all zeroes (channels(s):" %len(zero_ch), zero_ch,  ") and will be removed."
@@ -544,7 +545,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 paramsetstd_highsnr[i]= np.delete(paramset_std[i],ind_lowSNR)
                 
             
-        else:       
+        elif (snr_cut == None) and (zero_ch != []):       
             print "Used no SNR cutoff"          
             """Rename array to be same as when cut-off is used"""
             """If no SNR cutoff is used, remove channels with all zeroes 
@@ -562,8 +563,25 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
             paramset_highsnr = np.zeros([len(paramset),len(data_highsnr)])
             paramsetstd_highsnr = np.zeros([len(paramset),len(data_highsnr)])     
             for i in range(len(paramset)):
-                paramset_highsnr[i]= np.delete(paramset_highsnr[i],zero_ch)
-                paramsetstd_highsnr[i]= np.delete(paramsetstd_highsnr[i],zero_ch)
+                paramset_highsnr[i]= np.delete(paramset[i],zero_ch)
+                paramsetstd_highsnr[i]= np.delete(paramset_std[i],zero_ch)
+                
+                
+        else:
+            print "Used no SNR cutoff and there are no empty channels"          
+            data_highsnr = np.array(datas)
+            model_highsnr = np.array(noiselessmodels)
+            taus_highsnr = np.array(obtainedtaus)
+            lmfitstds_highsnr = np.array(lmfittausstds)
+            freqMHz_highsnr = np.array(freqmsMHz)
+            # New:
+            comp_rmss_highsnr = np.array(comp_rmss)
+            redchis_highsnr = np.array(redchis)
+            paramset_highsnr = np.array(paramset)
+            paramsetstd_highsnr = np.array(paramset_std)
+            
+            
+            
         
         taussec_highsnr = taus_highsnr*pbs
         lmfitstdssec_highsnr = lmfitstds_highsnr*pbs
@@ -661,14 +679,18 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 powout = powmod.fit(paramset_highsnr[0], powpars, x=freqMHz_highsnr, weights=1/((paramsetstd_highsnr[0])**2))
 
                 linmod = LinearModel()
+                
+                if len(freqMHz_highsnr) < 3:
+                    raise RuntimeError("plotparams == True: Less than three frequency channels. Cannot compute quadratic or exponential fit for width evolution. Consider lowering snr_cut.")
+                    
+                else:
+                    quadmod = QuadraticModel()          
+                    quadpars = quadmod.guess(paramset_highsnr[0], x=freqMHz_highsnr)
+                    quadout  = quadmod.fit(paramset_highsnr[0], quadpars, x=freqMHz_highsnr, weights=1/((paramsetstd_highsnr[0])**2))
 
-                quadmod = QuadraticModel()
-                quadpars = quadmod.guess(paramset_highsnr[0], x=freqMHz_highsnr)
-                quadout  = quadmod.fit(paramset_highsnr[0], quadpars, x=freqMHz_highsnr, weights=1/((paramsetstd_highsnr[0])**2))
-
-                expmod = ExponentialModel()
-                exppars = expmod.guess(paramset_highsnr[0], x=freqMHz_highsnr)
-                expout = expmod.fit(paramset_highsnr[0], exppars, x=freqMHz_highsnr, weights=1/((paramsetstd_highsnr[0])**2))
+                    expmod = ExponentialModel()
+                    exppars = expmod.guess(paramset_highsnr[0], x=freqMHz_highsnr)
+                    expout = expmod.fit(paramset_highsnr[0], exppars, x=freqMHz_highsnr, weights=1/((paramsetstd_highsnr[0])**2))
 
 
                 """Fit a DM model to delta mu"""
@@ -851,8 +873,11 @@ def produce_tauspectrum(freqMHz,taus,tauserr,log=True, plotspecevo=False,
         taus = taus[np.nonzero(tauserr)]
         freqGHz = freqGHz[np.nonzero(tauserr)]
         freqMHz = freqMHz[np.nonzero(tauserr)]
+        
+        if len(taus) < 3:
+               raise RuntimeError("Two or fewer tau-values. Cannot compute tau-spectrum.")
 
-        powout = powmod.fit(taus,powparstau,x=freqGHz,weights=1/(np.power(tauserr,2)))
+        powout = powmod.fit(taus,powparstau,x=freqGHz,weights=1.0/(np.power(tauserr,2)))
 
         print "\nPlotting fitted tau-spectrum\n"
         print(fit_report(powout.params))
@@ -1026,7 +1051,8 @@ if __name__ == '__main__':
     pulseperiod = args.period
     meth = args.method
     snrcut = args.snr_threshold
-    snrcut = float(snrcut)
+    if snrcut:
+        snrcut = float(snrcut)
     pulsar, nch, nbins,nsub, lm_rms, tsub = read_headerfull(filepath)
     
     if meth == None:
