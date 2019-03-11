@@ -784,7 +784,8 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 plt.ylabel(r'$\nu$ (MHz)',fontsize=14)
                 plt.ticklabel_format(style='sci', axis='x',scilimits=(0,0))
                 plt.legend(fontsize = 10, loc='best')
-                    
+                plt.tight_layout()
+
                 if savefigure == True:
                     figname2 = '%s_%s.png' %(os.path.basename(filepath),'fitting_parameters')
                     plt.savefig(figname2, dpi=200)
