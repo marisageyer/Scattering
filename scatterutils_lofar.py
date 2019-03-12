@@ -650,7 +650,8 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                     figname = '%s_%s_%s_%d.png' %(os.path.basename(filepath),'fitted_profiles', meth, k)
                     plt.savefig(figname, dpi=200)
                     print "Saved figure %s in ./" %figname
-                    plt.show()
+                    if noshow == False:
+                        plt.show()
 
             if verboseTag:
                 for i in range(npch):
@@ -790,8 +791,8 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                     figname2 = '%s_%s.png' %(os.path.basename(filepath),'fitting_parameters')
                     plt.savefig(figname2, dpi=200)
                     print "Saved figure %s in ./" %figname2
-                 
-                plt.show()
+                if noshow == False: 
+                    plt.show()
 
             if plotflux == True:  ##Flux section needs debugging
                     ls = 'solid'
@@ -906,8 +907,8 @@ def produce_tauspectrum(freqMHz,taus,tauserr,log=True, plotspecevo=False,
                 figname = '%s_%s.png' %(os.path.basename(filepath),'tau_spectrum')
                 plt.savefig(figname, dpi=200)
                 print "Saved figure %s in ./" %figname
-        
-        plt.show()
+        if noshow == False: 
+            plt.show()
 
         if plotspecevo == True:
             """Calculate spectral index evolution with addition of lowwer freq. channels"""
@@ -942,7 +943,8 @@ def produce_tauspectrum(freqMHz,taus,tauserr,log=True, plotspecevo=False,
                 figname = '%s_%s.png' %(os.path.basename(filepath),'alpha_evolution')
                 plt.savefig(figname, dpi=200)
                 print "Saved figure %s in ./" %figname
-            plt.show()
+            if noshow == False:
+               plt.show()
 
     return freqMHz, alpha, alphaerr, fit
 
@@ -1037,12 +1039,13 @@ if __name__ == '__main__':
     
     """Define options to the script"""
     parser = argparse.ArgumentParser()
-    parser.add_argument('-f','--filename', help="Required. Provide the pathway to the data files")
+    parser.add_argument('-f','--filename', help="Required. Provide the pathway to the ascii data files (created using pdv -KAt).")
     parser.add_argument('-p','--period',type=float, help="Optional. Provide the period of the pulsar in seconds. Default will call psrcat for P0.")
     parser.add_argument('-m','--method', help="Choosing method to fit data or simulation. Choose between 'onedim' and 'iso'. Default is 'iso'.")
     parser.add_argument('-snrcut','--snr_threshold', help="Optional. S/N threshold cut-off. Average per channel profiles with estimated S/N values lower than this will be excluded. Default value is None.")
+    parser.add_argument('-noshow','--no_show', default=False, help="Optional. Default value is False (i.e does display figures). Use -noshow to suppress all plt.show() commands.", action='store_true')
+    parser.add_argument('-nosavefig','--no_save_figure', default=False, help="Optional. Default is False (i.e. saves figures). To suppress all plt.savefig() commands use -nosavefig", action='store_true')
     args = parser.parse_args()
-  
 
     """Allocate variable names to the parsed options"""
     filepath = args.filename
@@ -1054,6 +1057,12 @@ if __name__ == '__main__':
     snrcut = args.snr_threshold
     if snrcut:
         snrcut = float(snrcut)
+
+    noshow = args.no_show
+    no_savefig = args.no_save_figure
+    savefig = not no_savefig
+
+    """Read ascii file header in full"""
     pulsar, nch, nbins,nsub, lm_rms, tsub = read_headerfull(filepath)
     
     if meth == None:
@@ -1086,9 +1095,9 @@ if __name__ == '__main__':
     """Produce scattering fits to pulse profiles"""
     freqMHz, taussec, taustdssec = produce_taufits(filepath, meth=meth,
             pulseperiod=per, snr_cut = snrcut, verbose=False, plotparams=True,
-            savefigure=True)
+            savefigure=savefig)
     
     """Produce tauspectrum"""
     freqMHz, alpha, alphaerr, fit = produce_tauspectrum(freqMHz, taussec,
-            taustdssec, log=True, plotspecevo=True, savefigure=True)
+            taustdssec, log=True, plotspecevo=True, savefigure=savefig)
 
