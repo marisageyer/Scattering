@@ -231,8 +231,10 @@ def broadfunc(x,tau):
 # 2. Extremely anisotropic scattering
 
 def broadfunc1D(x,tau):
+    if tau == 0:
+        print "Tau is zero!"
     broadfunc1 = (1.0/np.sqrt(x*tau*np.pi))*np.exp(-x/tau)
-    return broadfunc1
+    return np.nan_to_num(broadfunc1)
 
 
 def extractpulse(train, pulsesfromend, binsperpulse):
@@ -252,6 +254,7 @@ def extractpulse(train, pulsesfromend, binsperpulse):
         flux = np.sum(train[start:end]) - rectangle
         return train[start:end], zerobpulse, rectangle, flux
 
+"""double check where this is used"""
 def peaksnr(x, profile, snr):
     bins = profile.shape[0]
     noise = np.random.random(bins)
@@ -298,8 +301,18 @@ def GxETrain1D(x,mu, sigma, A, tau1, dc, nbins):
     climb, observed_nonoise, rec,flux = extractpulse(scat, 2, nbins)
     return observed_nonoise + dc
     
-    
-    
+""" Insert multi model in here"""
+
+def GxETrainMulti(x, ncomps, mus1, mus2, sigmas1, sigmas2, As1, As2, tau, dc, nbins):
+    bins, profile = makeprofile(nbins = nbins, ncomps = 2, amps = [As1,As2], means = [mus1,mus2], sigmas = [sigmas1,sigmas2])
+    binstau = np.linspace(1,nbins,nbins)
+    scat = psrscatter(broadfunc(binstau,tau),pulsetrain_bins(3, nbins, profile))
+    climb, observed_nonoise, rec, flux = extractpulse(scat, 2, nbins)
+    return observed_nonoise + dc
+"""
+
+"""
+
 def tau_fitter(data,nbins, verbose=True):
     profile_peak = np.max(data)
     binpeak = np.argmax(data)  
@@ -396,11 +409,146 @@ def tau_1D_fitter(data,nbins):
 
     return result, noiselessmodel, besttau, taustd, bestparams, bestparams_std, rchi, corsig
        
+
+"""insert multicomponent fitter in here"""
+
+def tau_fittermulti(data,nbins,guess_mean1, guess_mean2):
+    print "Max of data is", np.max(data)
+    guess_peak = np.max(data)
+    guess_peak2 = np.max(data)
+    modelname = GxETrainMulti
+    model = Model(modelname)
+
+    model.set_param_hint('nbins', value=nbins, vary=False)
+    model.set_param_hint('ncomps', value=2, vary=False)
+    model.set_param_hint('sigmas1', value=15, vary=True, min =0, max = nbins/4)
+    model.set_param_hint('sigmas2', value=15, vary=True, min =0, max = nbins/4)
+    model.set_param_hint('mus1', value=guess_mean1, vary=True,
+            min=560, max=650)
+    model.set_param_hint('mus2', value=guess_mean2, vary=True,
+            min=660, max=800)
+    model.set_param_hint('As1',value=guess_peak, vary=True,min=0)
+    model.set_param_hint('As2',value=guess_peak2, vary=True,min=0)
+    model.set_param_hint('tau',value=10, vary=True, min=0)
+    model.set_param_hint('dc',value = 0.1, vary = True)
     
+    pars = model.make_params()
+    xax=np.linspace(1,nbins,nbins)
     
+    #"""Fit data"""
+    result = model.fit(data,pars,x=xax)
+    print(result.fit_report(show_correl = False))
+
+    noiselessmodel = result.best_fit
+    besttau = result.best_values['tau']
+    taustd = result.params['tau'].stderr  ##estimated 1 sigma error
+
+    bestsig1 = result.best_values['sigmas1']
+    bestsig2 = result.best_values['sigmas2']
+    bestmu1 = result.best_values['mus1']
+    bestmu2 = result.best_values['mus2']
+    bestA1 = result.best_values['As1']
+    bestA2 = result.best_values['As2']
+
+    bestdc = result.best_values['dc']
+
+    bestsig_std1 = result.params['sigmas1'].stderr
+    bestsig_std2 = result.params['sigmas2'].stderr
+    bestmu_std1 = result.params['mus1'].stderr
+    bestmu_std2 = result.params['mus2'].stderr
+    bestA_std1 = result.params['As1'].stderr
+    bestA_std2 = result.params['As2'].stderr
+
+    bestdc_std = result.params['dc'].stderr
+
+    bestparams = np.array([bestsig1,bestsig2,bestmu1,bestmu2, bestA1, bestA2,bestdc])
+    bestparams_std = np.array([bestsig_std1,bestsig_std2, bestmu_std1,bestmu_std2, bestA_std1,bestA_std2,bestdc_std])
+
+    rchi = result.redchi
+
+    return noiselessmodel, besttau, taustd, bestparams, bestparams_std, rchi
     
-def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
-        verbose=True, plotparams=False, plotflux=False, savefigure=False):
+
+def produce_taufits_formulticomponent(filepath,guess_mean1,guess_mean2, meth='multi',pulseperiod=None,snr_cut=None,verbose=True):
+        pulsar, nch, nbins, nsub, lm_rms, tsub = read_headerfull(filepath)
+        print0 = "Pulsar name: %s" %pulsar
+        print1 = "Number of freq. channels: %d \nFreq channels will be labeled 0 - %d" %(nch, nch-1)
+        print2 = "Number of bins: %d" %nbins
+        print3 = "RMS: %.2f" %lm_rms
+        print4 = "Tsub: %.2f sec" %tsub
+        for k in range(5):
+           print eval('print{0}'.format(k))
+        print"--------------------------------------------------------"
+        pulseperiod = 0.84408066596
+        profilexaxis = np.linspace(0.0,pulseperiod,nbins)
+        pbs = pulseperiod/nbins
+        tbs = tsub/nbins
+        
+        
+        """Initialise vector outputs"""
+        obtainedtaus, lmfittausstds = [], []
+        """freqmsMHz will correctly associate scattering time values 
+        (tau) with frequency, taking into account frequency integration 
+        across a sub-band. Whereas freqcsMHz is the centre freq. to the subband"""
+        
+        freqmsMHz, freqcsMHz = [], []    
+        noiselessmodels =[]
+        results, datas, comp_SNRs, comp_rmss = [], [], [], []
+        redchis, paramset, paramset_std, correls = [], [], [], []
+        
+        halfway = nbins/2.
+
+        for i in range(nch):
+            print"--------------------------------------------------------"
+            print "Channel %d" %i
+            """Read in (pdv) data""" 
+            data, freqc, freqm = read_data(filepath,i,nbins)
+            freqmsMHz.append(freqm)
+            freqcsMHz.append(freqc)
+            # roll the data of lowest freq channel to middle of bins 
+            #if i ==0:
+            #    peakbin = np.argmax(data)
+            #    shift = int(halfway -int(peakbin))
+            #    if verboseTag:
+            #        print 'peak bin at lowest freq channel:%d' %peakbin
+            #else:
+            #    peakbin = peakbin
+            #    shift = int(halfway - int(peakbin))
+            #data = np.roll(data,shift)
+            #if verboseTag:
+            #    print "Rolling data by -%d bins" %shift
+            #comp_rms = find_rms(data,nbins)
+
+            if meth == 'multi':
+                noiselessmodel, besttau, taustd, bestparams, bestparams_std, rchi = tau_fittermulti(data,nbins,guess_mean1, guess_mean2)
+            else: "Multi method not chosen"
+            
+            plt.figure()
+            plt.plot(data, alpha=0.5)
+            plt.plot(noiselessmodel)
+            plt.show()
+
+            besttau, taustd = np.nan_to_num(besttau), np.nan_to_num(taustd)
+
+            print 'Channel Tau (ms): %.2f \pm %.2f ms' %(besttau,taustd)
+
+            obtainedtaus.append(np.nan_to_num(besttau))
+            lmfittausstds.append(np.nan_to_num(taustd))
+            noiselessmodels.append(np.nan_to_num(noiselessmodel))
+            #results.append(np.nan_to_num(result))
+
+            datas.append(np.nan_to_num(data))
+#            comp_SNRs.append(np.nan_to_num(comp_SNR))
+#            
+#            comp_rmss.append(np.nan_to_num(comp_rms))
+#            redchis.append(np.nan_to_num(redchi))
+
+        return freqmsMHz, obtainedtaus, lmfittausstds
+
+
+def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None, 
+        verbose=True, plotparams=False, plotflux=False, savefigure=False,
+        noshow=False):
         pulsar, nch, nbins,nsub, lm_rms, tsub = read_headerfull(filepath)
 
         if verbose == True:
@@ -478,20 +626,23 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
             comp_SNR =  find_peaksnr_smooth(data,comp_rms)
             print 'Estimated SNR (from data peak and rms): %.2f' % comp_SNR
 
-            print 'Channel Tau (ms): %.2f \pm %.2f ms' %(besttau,taustd)
             
+            besttau, taustd = np.nan_to_num(besttau), np.nan_to_num(taustd)
+            
+            print 'Channel Tau (ms): %.2f \pm %.2f ms' %(besttau,taustd)            
            
-            obtainedtaus.append(besttau)
-            lmfittausstds.append(taustd)
-            noiselessmodels.append(noiselessmodel)
-            results.append(result)
-            datas.append(data)
-            comp_SNRs.append(comp_SNR)
+            obtainedtaus.append(np.nan_to_num(besttau))
+            lmfittausstds.append(np.nan_to_num(taustd))
+            noiselessmodels.append(np.nan_to_num(noiselessmodel))
+            results.append(np.nan_to_num(result))
+            datas.append(np.nan_to_num(data))
+            comp_SNRs.append(np.nan_to_num(comp_SNR))
             #new:
-            comp_rmss.append(comp_rms)
-            redchis.append(redchi)
-            paramset.append(bestparams)
-            paramset_std.append(bestparams_std)
+            comp_rmss.append(np.nan_to_num(comp_rms))
+            redchis.append(np.nan_to_num(redchi))
+            paramset.append(np.nan_to_num(bestparams))
+            paramset_std.append(np.nan_to_num(bestparams_std))
+
         #    if plotflux == True:
         #        correls.append(corsig)
         
@@ -519,8 +670,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
             print "%d channels have all zeroes (channels(s):" %len(zero_ch), zero_ch,  ") and will be removed."
             if verboseTag:
                 print "All zero channels are assigned SNR of 0"
-
-          
+                
         if snr_cut: 
             print "Using SNR cutoff of %.2f" %snr_cut
             comp_SNRs = np.nan_to_num(comp_SNRs)
@@ -579,8 +729,6 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
             redchis_highsnr = np.array(redchis)
             paramset_highsnr = np.array(paramset)
             paramsetstd_highsnr = np.array(paramset_std)
-            
-            
             
         
         taussec_highsnr = taus_highsnr*pbs
@@ -660,13 +808,34 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                     tau1GHz = tauatfreq(freqMHz_highsnr[i]/1000.,taussec_highsnr[i],1.0,4)
                     print 'tau1GHz_alpha_4 (ms) ~ %.4f' %(tau1GHz*1000)
 
-            lmfitstdssec_highsnr = lmfitstdssec_highsnr[np.nonzero(lmfitstdssec_highsnr)]
-            taussec_highsnr = taussec_highsnr[np.nonzero(lmfitstdssec_highsnr)]
-            freqMHz_highsnr = freqMHz_highsnr[np.nonzero(lmfitstdssec_highsnr)]
-            
+            print redchis_highsnr
+
             """Plot 2: Plot Gaussian fitting parameters and DM if selected"""
         
             if plotparams==True:
+                
+                """To peform Gaussian parameter fits, pick out where the fits have
+                failed, using where lmfitstdssec_highsnr"""
+                """The failed fits will still be visible from the profile plots
+                above"""
+            
+                taustd_non_zero =  np.nonzero(lmfitstdssec_highsnr)
+                
+                ## Keep copy of freq channels, before removing ones with zero taustd
+                freqMHz_highsnr_npch = freqMHz_highsnr   
+                
+                lmfitstdssec_highsnr = lmfitstdssec_highsnr[taustd_non_zero]
+                taussec_highsnr = taussec_highsnr[taustd_non_zero]
+                freqMHz_highsnr = freqMHz_highsnr[taustd_non_zero]
+            
+                nrparams = np.shape(paramset_highsnr)[0]
+            
+                paramset_highsnr = [paramset_highsnr[i][taustd_non_zero] for i in range(nrparams)]
+                paramsetstd_highsnr = [paramsetstd_highsnr[i][taustd_non_zero] for i in range(nrparams)]
+            
+                npch_noz = len(freqMHz_highsnr)
+                npch = npch_noz
+                
                 print "\nPlotting Gaussian fit parameters w.r.t frequency\n"
                 """Set plotting parameters"""
                 alfval = 0.6
@@ -675,6 +844,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 plt.figure(numplots+1, figsize=(12,8))
                 plt.subplots_adjust(left = 0.055, right=0.98,wspace=0.35,hspace=0.4,bottom=0.08)               
                 """Fit models to sigma"""
+
                 powmod = PowerLawModel()
                 powpars = powmod.guess(paramset_highsnr[0], x=freqMHz_highsnr)
                 powout = powmod.fit(paramset_highsnr[0], powpars, x=freqMHz_highsnr, weights=1/((paramsetstd_highsnr[0])**2))
@@ -717,7 +887,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 ## Plot reduced chi square:
                 
                 plt.subplot(2,3,1)
-                plt.plot(freqMHz_highsnr, redchis_highsnr/np.power(comp_rmss_highsnr,2), markr,alpha=alfval,markersize = msize)
+                plt.plot(freqMHz_highsnr_npch, redchis_highsnr/np.power(comp_rmss_highsnr,2), markr,alpha=alfval,markersize = msize)
                 plt.title(r'Reduced $\chi^2$ values', fontsize=12)
                 plt.yticks(fontsize=12)
                 plt.xticks(fontsize=12)
@@ -852,11 +1022,11 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                     plt.ylabel(r'Calibrated flux (mJy)',fontsize=12)
                 
         
-        return freqMHz_highsnr, taussec_highsnr, lmfitstdssec_highsnr
+        return freqMHz_highsnr, taussec_highsnr, lmfitstdssec_highsnr, paramsetstd_highsnr
 
 
 def produce_tauspectrum(freqMHz,taus,tauserr,log=True, plotspecevo=False,
-        savefigure=False):
+        noshow= False, savefigure=False):
     
     if len(taus) < 2:
         print "Can't perform power law fit on single value. Returning spectral index = 0.0"
@@ -1092,12 +1262,21 @@ if __name__ == '__main__':
     else:
         per=pulseperiod
 
-    """Produce scattering fits to pulse profiles"""
-    freqMHz, taussec, taustdssec = produce_taufits(filepath, meth=meth,
-            pulseperiod=per, snr_cut = snrcut, verbose=False, plotparams=True,
-            savefigure=savefig)
-    
+    #"""Produce scattering fits to pulse profiles"""
+    #freqMHz, taussec, taustdssec, params = produce_taufits(filepath, meth=meth, 
+    #        pulseperiod=per, snr_cut = snrcut, verbose=True, plotparams=True,
+    #        savefigure=savefig)
+
     """Produce tauspectrum"""
-    freqMHz, alpha, alphaerr, fit = produce_tauspectrum(freqMHz, taussec,
-            taustdssec, log=True, plotspecevo=True, savefigure=savefig)
+    #freqMHz, alpha, alphaerr, fit = produce_tauspectrum(freqMHz, taussec,
+    #        taustdssec, log=True, plotspecevo=True, savefigure=savefig)
+    #
+    #
+
+    #testmodel = GxETrainMulti(np.linspace(1,1024,1024), 2, 400, 500, 2, 3, 4,5,220, 0.5, 1024)
+    #plt.figure()
+    #plt.plot(testmodel)
+
+    freqMHz_highsnr, taussec_highsnr, lmfitstdssec_highsnr=produce_taufits_formulticomponent(filepath,meth='multi',guess_mean1=590.0,guess_mean2=700,pulseperiod=None,snr_cut=None,verbose=True)
+
 
