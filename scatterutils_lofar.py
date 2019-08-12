@@ -475,8 +475,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                         result, noiselessmodel, besttau, taustd, bestparams, bestparams_std, redchi, corsig = tau_1D_fitter(data,nbins)         
 
             else:
-                print "Method is not in [None, iso, onedim]. Choose a method
-                from this list" 
+                print "Method is not in [None, iso, onedim]. Choose a method from this list" 
 
             comp_SNR_model = find_peaksnr(noiselessmodel,comp_rms)
 
