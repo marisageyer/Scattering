@@ -8,10 +8,8 @@ import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 from lmfit import Model, conf_interval, printfuncs
-from lmfit.models import GaussianModel, PowerLawModel 
-from lmfit import Model, conf_interval, printfuncs
 from lmfit import minimize, Parameter, Parameters, fit_report
-from lmfit.models import LinearModel, PowerLawModel, ExponentialModel, QuadraticModel 
+from lmfit.models import LinearModel, PowerLawModel, ExponentialModel, QuadraticModel, GaussianModel 
 
 
 def writePDVtimeSeries(dspec, freqs, tspan, nch=1, src='FRB', ofn='timeseries.ascii'): 
@@ -66,6 +64,7 @@ def writePDVtimeSeries(dspec, freqs, tspan, nch=1, src='FRB', ofn='timeseries.as
 ### Read ascii files
 
 def read_headerfull(filepath):
+    """Read asciis as produced by pdv -KAt"""
     f = open(filepath)
     lines = f.readlines()
     header0 = lines[0]
@@ -90,6 +89,7 @@ def read_headerfull(filepath):
 
 
 def read_data(filepath, profilenumber, nbins):
+    """Read data as produced by pdv -KAt"""
     d = open(filepath)
     lines = d.readlines()
     
@@ -403,7 +403,7 @@ def tau_1D_fitter(data,nbins):
     
     
 def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
-        verbose=True, plotparams=False, plotflux=False, savefigure=False):
+        verbose=True, plotparams=False, plotflux=False, savefigure=False, noshow=False):
         pulsar, nch, nbins,nsub, lm_rms, tsub = read_headerfull(filepath)
 
         if verbose == True:
@@ -739,6 +739,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 plt.xticks(fontsize=12)
                 plt.xlabel(r'$\nu$ MHz',fontsize=14)
                 plt.legend(fontsize = 10, loc='best')
+                plt.ylim(np.min(paramset_highsnr[0]*pbs)-1.5*np.median(paramsetstd_highsnr[0]*pbs),np.max(paramset_highsnr[0]*pbs)+1.5*np.median(paramsetstd_highsnr[0]*pbs))
                 
                  ## Plot mean:
                 
@@ -750,10 +751,10 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 plt.yticks(fontsize=12)
                 plt.xticks(fontsize=12)
                 plt.xlabel(r'$\nu$ MHz',fontsize=14)
+                plt.ylim(np.min(paramset_highsnr[1]*pbs)-1.5*np.median(paramsetstd_highsnr[1]*pbs),np.max(paramset_highsnr[1]*pbs)+1.5*np.median(paramsetstd_highsnr[1]*pbs))
                 #plt.legend(fontsize = 9, loc='best')
                 
                 ## Plot amplitude:
-                
                 plt.subplot(2,3,4)
                 #plt.errorbar(freqMHz_highsnr,paramset_highsnr[2]*pbs)
                 plt.errorbar(freqMHz_highsnr,paramset_highsnr[2]*pbs,yerr =paramsetstd_highsnr[2]*pbs, fmt = markr,markersize=msize,capthick=2,linewidth=1.5,alpha=alfval)
@@ -762,18 +763,20 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 plt.yticks(fontsize=12)
                 plt.xticks(fontsize=12)
                 plt.xlabel(r'$\nu$ MHz',fontsize=14)
+                plt.ylim(np.min(paramset_highsnr[2]*pbs)-1.5*np.median(paramsetstd_highsnr[2]*pbs),np.max(paramset_highsnr[2]*pbs)+1.5*np.median(paramsetstd_highsnr[2]*pbs))
                 #plt.legend(fontsize = 9, loc='best')
                 
                 ## Plot DC:
                 
                 plt.subplot(2,3,5)
-                #plt.errorbar(freqMHz_highsnr,paramset_highsnr[2]*pbs)
+                #plt.errorbar(freqMHz_highsnr,paramset_highsnr[3]*pbs)
                 plt.errorbar(freqMHz_highsnr,paramset_highsnr[3]*pbs,yerr =paramsetstd_highsnr[3]*pbs, fmt = markr,markersize=msize,capthick=2,linewidth=1.5,alpha=alfval)
                 plt.ylabel(r'$\mu$ (sec)')
                 plt.title(r'DC offset', fontsize=12)
                 plt.yticks(fontsize=12)
                 plt.xticks(fontsize=12)
                 plt.xlabel(r'$\nu$ MHz',fontsize=14)
+                plt.ylim(np.min(paramset_highsnr[3]*pbs)-1.5*np.median(paramsetstd_highsnr[3]*pbs),np.max(paramset_highsnr[3]*pbs)+1.5*np.median(paramsetstd_highsnr[3]*pbs))
                 #plt.legend(fontsize = 9, loc='best')
                 
                  ## Plot DM:
@@ -787,6 +790,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 plt.ylabel(r'$\nu$ (MHz)',fontsize=14)
                 plt.ticklabel_format(style='sci', axis='x',scilimits=(0,0))
                 plt.legend(fontsize = 10, loc='best')
+                plt.xlim(np.min(delmuarray)-5.0*np.median(delmu_stdarray),np.max(delmuarray)+5.0*np.median(delmu_stdarray))
                 plt.tight_layout()
 
                 if savefigure == True:
@@ -858,13 +862,17 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
 
 
 def produce_tauspectrum(freqMHz,taus,tauserr,log=True, plotspecevo=False,
-        savefigure=False):
+        savefigure=False, noshow=False):
     
-    if len(taus) < 2:
+    plt.figure(figsize=(10,6))
+    if noshow == False:
+        plt.show()
+    if len(taus) <= 2:
         print "Can't perform power law fit on single value. Returning spectral index = 0.0"
         alpha=0
         alphaerr=0
         fit=taus
+
     
     else:  
         freqGHz = freqMHz/1000.
@@ -879,74 +887,77 @@ def produce_tauspectrum(freqMHz,taus,tauserr,log=True, plotspecevo=False,
         freqMHz = freqMHz[np.nonzero(tauserr)]
         
         if len(taus) < 3:
-               raise RuntimeError("Two or fewer tau-values. Cannot compute tau-spectrum.")
+            print "Two or fewer tau-values. Cannot compute tau-spectrum."
+            alpha=0
+            alphaerr=0
+            fit=taus
+        else:
+            powout = powmod.fit(taus,powparstau,x=freqGHz,weights=1.0/(np.power(tauserr,2)))
 
-        powout = powmod.fit(taus,powparstau,x=freqGHz,weights=1.0/(np.power(tauserr,2)))
+            print "\nPlotting fitted tau-spectrum\n"
+            print(fit_report(powout.params))
+            fit = powout.best_fit
+            alpha = -powout.best_values['exponent']
+            alphaerr = powout.params['exponent'].stderr
 
-        print "\nPlotting fitted tau-spectrum\n"
-        print(fit_report(powout.params))
-        fit = powout.best_fit
-        alpha = -powout.best_values['exponent']
-        alphaerr = powout.params['exponent'].stderr
-
-        plt.figure(figsize=(10,6))         
-        plt.errorbar(freqMHz,taus,yerr=tauserr,fmt='*-', markersize=10.0,capthick=2,linewidth=1.5, label='data')
-        plt.plot(freqMHz,fit,ls='dashed',linewidth=1.5,label=r'$\alpha = %.1f \pm %.1f$' %(alpha,alphaerr))
-        if log:
-            plt.xscale('log')
-            plt.yscale('log')
-        plt.yticks(fontsize=12)
-        #ticksMHz = (freqMHz).astype(np.int)[0:len(freqMHz):2]
-        #plt.xticks(ticksMHz,ticksMHz,fontsize=11)
-        plt.xticks(fontsize=11)
-        leg = plt.legend(fontsize=12,numpoints=None)
-        plt.xlabel(r'$\nu$ (MHz)',fontsize=14, labelpad=15.0)
-        plt.ylabel(r'$\tau$ (sec)',fontsize=14)
-        plt.xlim(xmin = 0.95*freqMHz[0],xmax=1.05*freqMHz[-1])
-        plt.gcf().subplots_adjust(bottom=0.15)
-        
-        if savefigure == True:
-                figname = '%s_%s.png' %(os.path.basename(filepath),'tau_spectrum')
-                plt.savefig(figname, dpi=200)
-                print "Saved figure %s in ./" %figname
-        if noshow == False: 
-            plt.show()
-
-        if plotspecevo == True:
-            """Calculate spectral index evolution with addition of lowwer freq. channels"""
-            npch = len(freqMHz)
-            spec_sec = np.zeros(npch-1)
-            spec_std_sec = np.zeros(npch-1)
-                         
-            for i in range(npch-1):
-                bb = npch - (i+2)  ##index begin
-                ee = npch ## index end
-            #   print freqms[bb:ee]
-                
-                powparstau_sec = powmod.guess(taus[bb:ee],x=freqMHz[bb:ee])
-                powouttau_sec = powmod.fit(taus[bb:ee],powparstau_sec, x=freqMHz[bb:ee],weights=1/(tauserr[bb:ee]**2))
-                spec_sec[i] = -powouttau_sec.best_values['exponent']
-                spec_std_sec[i] = powouttau_sec.params['exponent'].stderr
-
-            freq_incl = freqMHz[::-1][1:]
-
-            plt.figure(figsize=(10,6))
-            plt.errorbar(freq_incl,spec_sec,yerr=spec_std_sec, fmt='*',alpha=0.6,markersize=12.0,capthick=2,linewidth=0.5)                    
-            plt.title(r'Change in spectral index', fontsize=12)
-            for x,y in zip(freq_incl[0::2], spec_sec[0::2]):
-                plt.annotate('%.2f' %y, xy=(x,1.08*y), xycoords='data',textcoords='data')
-            plt.ylim(plt.ylim()[0],1.1*plt.ylim()[1])
+     
+            plt.errorbar(freqMHz,taus,yerr=tauserr,fmt='*-', markersize=10.0,capthick=2,linewidth=1.5, label='data')
+            plt.plot(freqMHz,fit,ls='dashed',linewidth=1.5,label=r'$\alpha = %.1f \pm %.1f$' %(alpha,alphaerr))
+            if log:
+                plt.xscale('log')
+                plt.yscale('log')
             plt.yticks(fontsize=12)
-            plt.xticks(fontsize=12)
-            plt.xlabel(r'Lowest freq included (MHz)',fontsize=12)
-            plt.ylabel(r'$\alpha$',fontsize=12)
+            #ticksMHz = (freqMHz).astype(np.int)[0:len(freqMHz):2]
+            #plt.xticks(ticksMHz,ticksMHz,fontsize=11)
+            plt.xticks(fontsize=11)
+            leg = plt.legend(fontsize=12,numpoints=None)
+            plt.xlabel(r'$\nu$ (MHz)',fontsize=14, labelpad=15.0)
+            plt.ylabel(r'$\tau$ (sec)',fontsize=14)
+            plt.xlim(xmin = 0.95*freqMHz[0],xmax=1.05*freqMHz[-1])
+            plt.gcf().subplots_adjust(bottom=0.15)
 
             if savefigure == True:
-                figname = '%s_%s.png' %(os.path.basename(filepath),'alpha_evolution')
-                plt.savefig(figname, dpi=200)
-                print "Saved figure %s in ./" %figname
-            if noshow == False:
-               plt.show()
+                    figname = '%s_%s.png' %(os.path.basename(filepath),'tau_spectrum')
+                    plt.savefig(figname, dpi=200)
+                    print "Saved figure %s in ./" %figname
+            if noshow == False: 
+                plt.show()
+
+            if plotspecevo == True:
+                """Calculate spectral index evolution with addition of lowwer freq. channels"""
+                npch = len(freqMHz)
+                spec_sec = np.zeros(npch-1)
+                spec_std_sec = np.zeros(npch-1)
+
+                for i in range(npch-1):
+                    bb = npch - (i+2)  ##index begin
+                    ee = npch ## index end
+                #   print freqms[bb:ee]
+
+                    powparstau_sec = powmod.guess(taus[bb:ee],x=freqMHz[bb:ee])
+                    powouttau_sec = powmod.fit(taus[bb:ee],powparstau_sec, x=freqMHz[bb:ee],weights=1/(tauserr[bb:ee]**2))
+                    spec_sec[i] = -powouttau_sec.best_values['exponent']
+                    spec_std_sec[i] = powouttau_sec.params['exponent'].stderr
+
+                freq_incl = freqMHz[::-1][1:]
+
+                plt.figure(figsize=(10,6))
+                plt.errorbar(freq_incl,spec_sec,yerr=spec_std_sec, fmt='*',alpha=0.6,markersize=12.0,capthick=2,linewidth=0.5)                    
+                plt.title(r'Change in spectral index', fontsize=12)
+                for x,y in zip(freq_incl[0::2], spec_sec[0::2]):
+                    plt.annotate('%.2f' %y, xy=(x,1.08*y), xycoords='data',textcoords='data')
+                plt.ylim(plt.ylim()[0],1.1*plt.ylim()[1])
+                plt.yticks(fontsize=12)
+                plt.xticks(fontsize=12)
+                plt.xlabel(r'Lowest freq included (MHz)',fontsize=12)
+                plt.ylabel(r'$\alpha$',fontsize=12)
+
+                if savefigure == True:
+                    figname = '%s_%s.png' %(os.path.basename(filepath),'alpha_evolution')
+                    plt.savefig(figname, dpi=200)
+                    print "Saved figure %s in ./" %figname
+                if noshow == False:
+                    plt.show()
 
     return freqMHz, alpha, alphaerr, fit
 
