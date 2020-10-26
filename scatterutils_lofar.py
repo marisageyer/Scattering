@@ -7,6 +7,7 @@ import argparse
 import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 from lmfit import Model, conf_interval, printfuncs
 from lmfit import minimize, Parameter, Parameters, fit_report
 from lmfit.models import LinearModel, PowerLawModel, ExponentialModel, QuadraticModel, GaussianModel 
@@ -945,10 +946,10 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
         return freqMHz_highsnr, taussec_highsnr, lmfitstdssec_highsnr
 
 
+
 def produce_tauspectrum(freqMHz,taus,tauserr,log=True, plotspecevo=False,
         savefigure=False, noshow=False):
     
-    plt.figure(figsize=(10,6))
     if noshow == False:
         plt.show()
     if len(taus) <= 2:
@@ -983,26 +984,51 @@ def produce_tauspectrum(freqMHz,taus,tauserr,log=True, plotspecevo=False,
             fit = powout.best_fit
             alpha = -powout.best_values['exponent']
             alphaerr = powout.params['exponent'].stderr
+            
+            fig, ax = plt.subplots(figsize=(10, 8))
+            if taus[0] < 0.1:
+                taus = 1000*taus
+                tauserr = 1000*tauserr
+                fit = 1000*fit
+                ax.set_ylabel(r'$\tau$ (ms)',fontsize=22)
+            else:
+                taus = taus
+                fit = fit
+                ax.set_ylabel(r'$\tau$ (sec)',fontsize=22)
 
-     
-            plt.errorbar(freqMHz,taus,yerr=tauserr,fmt='*-', markersize=10.0,capthick=2,linewidth=1.5, label='data')
-            plt.plot(freqMHz,fit,ls='dashed',linewidth=1.5,label=r'$\alpha = %.1f \pm %.1f$' %(alpha,alphaerr))
+            
+    
+            ax.errorbar(freqMHz,taus,yerr=tauserr,fmt='*-', markersize=10.0,capthick=2,linewidth=1.5, label='data')
+            ax.plot(freqMHz,fit,ls='dashed',linewidth=1.5,label=r'$\alpha = %.1f \pm %.1f$' %(alpha,alphaerr))
             if log:
-                plt.xscale('log')
-                plt.yscale('log')
-            plt.yticks(fontsize=12)
-            #ticksMHz = (freqMHz).astype(np.int)[0:len(freqMHz):2]
-            #plt.xticks(ticksMHz,ticksMHz,fontsize=11)
-            plt.xticks(fontsize=11)
-            leg = plt.legend(fontsize=12,numpoints=None)
-            plt.xlabel(r'$\nu$ (MHz)',fontsize=14, labelpad=15.0)
-            plt.ylabel(r'$\tau$ (sec)',fontsize=14)
-            plt.xlim(xmin = 0.95*freqMHz[0],xmax=1.05*freqMHz[-1])
-            plt.gcf().subplots_adjust(bottom=0.15)
+                ax.set_xscale('log')
+                ax.set_yscale('log')
+                
+            ax.yaxis.set_major_formatter(ticker.ScalarFormatter())
+            ax.yaxis.set_minor_formatter(ticker.NullFormatter())
+  
+            ax.set_xticks(np.round(freqMHz))
+            ax.set_yticks(taus[0:len(taus):2])
+ 
+            ax.xaxis.set_minor_formatter(ticker.NullFormatter())
+            ax.xaxis.set_major_formatter(ticker.ScalarFormatter())
+
+            ax.tick_params(axis='x', labelsize=16)
+            ax.tick_params(axis='y', labelsize=16)
+            
+
+
+                   
+            leg = plt.legend(fontsize=18,numpoints=None)
+            ax.set_xlabel(r'$\nu$ (MHz)',fontsize=22, labelpad=15.0)
+            
+            
+            #ax.set_xlim(xmin = 0.95*freqMHz[0],xmax=1.05*freqMHz[-1])
+    
 
             if savefigure == True:
                     figname = '%s_%s.png' %(os.path.basename(filepath),'tau_spectrum')
-                    plt.savefig(figname, dpi=200)
+                    plt.savefig(figname, dpi=200,bbox_inches='tight', pad_inches=0)
                     print "Saved figure %s in ./" %figname
             if noshow == False: 
                 plt.show()
@@ -1038,7 +1064,7 @@ def produce_tauspectrum(freqMHz,taus,tauserr,log=True, plotspecevo=False,
 
                 if savefigure == True:
                     figname = '%s_%s.png' %(os.path.basename(filepath),'alpha_evolution')
-                    plt.savefig(figname, dpi=200)
+                    plt.savefig(figname, dpi=200,bbox_inches='tight', pad_inches=0)
                     print "Saved figure %s in ./" %figname
                 if noshow == False:
                     plt.show()
@@ -1192,9 +1218,9 @@ if __name__ == '__main__':
     """Produce scattering fits to pulse profiles"""
     freqMHz, taussec, taustdssec = produce_taufits(filepath, meth=meth,
             pulseperiod=per, snr_cut = snrcut, verbose=False, plotparams=True,
-            savefigure=savefig)
+            savefigure=savefig,noshow=noshow)
     
     """Produce tauspectrum"""
     freqMHz, alpha, alphaerr, fit = produce_tauspectrum(freqMHz, taussec,
-            taustdssec, log=True, plotspecevo=True, savefigure=savefig)
+            taustdssec, log=True, plotspecevo=True, savefigure=savefig,noshow=noshow)
 
