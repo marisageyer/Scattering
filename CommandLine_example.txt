@@ -1,0 +1,58 @@
+The scattering code is available here: https://github.com/marisageyer/Scattering
+
+Using scatterutils_lofar.py:
+
+The command line version of the code takes in ascii files created from pulsar archives (tscrunched, pscrunched and with your chosen nchans) using the following pdv command:
+
+pdv -KAt archive-file > ascii.file
+
+(this is a psrchive utility that writes archive files out to ascii files. The -KAt adds relevant headers:
+
+  -K          Start header lines with #
+  -t          Print out profiles as ASCII text
+  -A          Print out profiles as ASCII text (with per channel headers)
+
+
+Once you have an ascii file you can do scattering fits. 
+An ascii file is included in the repo as an example to use.
+
+usage: scatterutils_lofar.py [-h] [-f FILENAME] [-p PERIOD] [-m METHOD]
+                             [-snrcut SNR_THRESHOLD]
+
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -f FILENAME, --filename FILENAME
+                        Required. Provide the pathway to the data files
+  -p PERIOD, --period PERIOD
+                        Optional. Provide the period of the pulsar in seconds.
+                        Default will call psrcat for P0.
+  -m METHOD, --method METHOD
+                        Choosing method to fit data or simulation. Choose
+                        between 'onedim' and 'iso'. Default is 'iso'.
+  -snrcut SNR_THRESHOLD, --snr_threshold SNR_THRESHOLD
+                        Optional. S/N threshold cut-off. Average per channel
+                        profiles with estimated S/N values lower than this
+                        will be excluded. Default value is None.
+
+
+The example can be run as:  
+
+python scatterutils_lofar.py -f B1915+13_L169239_SAP0_BEAM0.paz.calib.Tp.f50.ascii -m iso -snrcut 3.0
+
+This will execute and procede to do the tau-fits, gaussian parameter fits, and save plots, as can be seen in the last lines of the code itself:
+
+
+   """Produce scattering fits to pulse profiles"""
+    freqMHz, taussec, taustdssec = produce_taufits(filepath, meth=meth,
+            pulseperiod=per, snr_cut = snrcut, verbose=False, plotparams=True,
+            savefigure=True)
+
+    """Produce tauspectrum"""
+    freqMHz, alpha, alphaerr, fit = produce_tauspectrum(freqMHz, taussec,
+            taustdssec, log=True, plotspecevo=True, savefigure=True)
+
+
+
+These produce_taufits and produce_tauspectrum functions are also the ones I use within the jupyter notebooks, see the notebook example in the repo. You can pick to plot fewer things by e.g. having plotparams=False (doesn't plot gaussian parameter outcomes). 
+
