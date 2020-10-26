@@ -59,7 +59,28 @@ def writePDVtimeSeries(dspec, freqs, tspan, nch=1, src='FRB', ofn='timeseries.as
     ofh.write(hdrStr)
     ofh.close()
     
+## Create ascii in python
+def archive_to_ascii(archive, nchan=None, verbose=False):
+    if nchan is not None:
+        fn, ext = os.path.splitext(archive)
+        new_ext = "."+str(nchan)+"ch"
+        pam_comand = ['pam', '--setnchn', str(nchan), '-e', ext+new_ext, archive]
+        pam_Popen = subprocess.Popen(pam_comand, shell=False, cwd='.', stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        (stdoutdata, stderrdata) = pam_Popen.communicate()
+        if verbose == True:
+            print stdoutdata
+        inname = str(archive)+new_ext
+    else:
+        inname = archive
 
+    outname = inname+".ascii"
+    ascii_file = open(outname, 'a')
+    pdv_comand = ['pdv', '-KAt', inname]
+    pdv_Popen = subprocess.Popen(pdv_comand, shell=False, cwd='.', stdout=ascii_file)
+    (stdoutdata, stderrdata) = pdv_Popen.communicate()
+    if verbose == True:
+        print "Ascii saved as %s" %outname
+    return outname
     
 ### Read ascii files
 
@@ -85,7 +106,6 @@ def read_headerfull(filepath):
     tsub = float(h1_lines[4])  
 #    return file_name, pulsar_name, nsub, nch, npol, nbins, rms
     return pulsar_name, nch, nbins, nsub, rms, tsub
-
 
 
 def read_data(filepath, profilenumber, nbins):
