@@ -63,11 +63,12 @@ def writePDVtimeSeries(dspec, freqs, tspan, nch=1, src='FRB', ofn='timeseries.as
 def archive_to_ascii(archive, nchan=None, verbose=False):
     if nchan is not None:
         fn, ext = os.path.splitext(archive)
-        new_ext = "."+str(nchan)+"ch"
-        pam_comand = ['pam', '--setnchn', str(nchan), '-e', ext+new_ext, archive]
+        new_ext = ".DTp"+str(nchan)+"ch"
+        pam_comand = ['pam', '-DTp','--setnchn', str(nchan), '-e', ext+new_ext, archive]
         pam_Popen = subprocess.Popen(pam_comand, shell=False, cwd='.', stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         (stdoutdata, stderrdata) = pam_Popen.communicate()
         if verbose == True:
+            print "Archive has been dedispersed, t-scrunched and p-scrunched"
             print stdoutdata
         inname = str(archive)+new_ext
     else:
@@ -346,7 +347,7 @@ def tau_fitter(data,nbins, verbose=True):
     besttau = result.best_values['tau']
     taustd = result.params['tau'].stderr  ##estimated 1 sigma error
     if taustd == None:
-       taustd = 0
+        taustd = 0
 
     bestsig = result.best_values['sigma']
     bestmu = result.best_values['mu']
@@ -373,7 +374,63 @@ def tau_fitter(data,nbins, verbose=True):
     return result, noiselessmodel, besttau, taustd, bestparams, bestparams_std, rchi, corsig
 
 
-def tau_1D_fitter(data,nbins):
+def tau_fitter_guess(data,nbins,mu_guess, sigma_guess,tau_guess,verbose=True):
+    profile_peak = np.max(data)
+    #binpeak = np.argmax(data)
+    modelname = GxETrain
+    model = Model(modelname)
+
+    model.set_param_hint('nbins', value=nbins, vary=False)
+    model.set_param_hint('sigma', value=sigma_guess, vary=True, min =0, max = nbins)
+    model.set_param_hint('mu', value=mu_guess, vary=True, min=0, max = nbins)
+    model.set_param_hint('A',value=profile_peak, vary=True, min=0)
+    model.set_param_hint('tau',value=tau_guess, vary=True, min=0)
+    model.set_param_hint('dc',value = 0, vary = True)
+    pars = model.make_params()
+    xax=np.linspace(1,nbins,nbins)
+
+    #"""Fit data"""
+    result = model.fit(data,pars,x=xax)
+    if verbose == True:
+        print(result.fit_report(show_correl = True))
+    else:
+        print "To see fit report, use verbose=True"
+
+    noiselessmodel = result.best_fit
+    besttau = result.best_values['tau']
+    taustd = result.params['tau'].stderr  ##estimated 1 sigma error
+    if taustd == None:
+        taustd = 0
+
+    bestsig = result.best_values['sigma']
+    bestmu = result.best_values['mu']
+    bestA = result.best_values['A']
+    bestdc = result.best_values['dc']
+
+    bestsig_std = result.params['sigma'].stderr
+    bestmu_std = result.params['mu'].stderr
+    bestA_std = result.params['A'].stderr
+    bestdc_std = result.params['dc'].stderr
+
+    bestparams = np.array([bestsig,bestmu,bestA,bestdc])
+    bestparams_std = np.array([bestsig_std,bestmu_std,bestA_std,bestdc_std])
+
+    if verbose == True:
+        print "Order of best fit parameters are: sigma, mu, A, dc"
+
+    """correlations with sigma"""
+    corsig = result.params['sigma'].correl
+    #corA = result.params['A'].correl
+    #corlist = [corsig,corA]
+
+
+    rchi = result.redchi
+    #return best values and std errors on the other parameters as well
+
+    return result, noiselessmodel, besttau, taustd, bestparams, bestparams_std, rchi, corsig
+
+
+def tau_1D_fitter(data,nbins,verbose=True):
 
     profile_peak = np.max(data)
     binpeak = np.argmax(data)
@@ -390,7 +447,11 @@ def tau_1D_fitter(data,nbins):
     pars = model.make_params()
 
     result = model.fit(data,pars,x=np.linspace(1,nbins,nbins))
-#    print(result.fit_report(show_correl = False))
+
+    if verbose == True:
+        print(result.fit_report(show_correl = True))
+    else:
+        print "To see fit report, use verbose=True"
 
     noiselessmodel = result.best_fit
     besttau = result.best_values['tau1']
@@ -434,7 +495,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
         print0 = "Pulsar name: %s" %pulsar
         print1 = "Number of freq. channels: %d \nFreq channels will be labeled 0 - %d" %(nch, nch-1)
         print2 = "Number of bins: %d" %nbins
-        print3 = "RMS: %.2f" %lm_rms
+        print3 = "RMS from ascii header: %f" %lm_rms
         print4 = "Tsub: %.2f sec" %tsub 
         for k in range(5):
               print eval('print{0}'.format(k))
