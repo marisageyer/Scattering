@@ -542,7 +542,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 shift = int(halfway - int(peakbin))
             data = np.roll(data,shift)
             if verboseTag:
-                print "Rolling data by -%d bins" %shift
+                print "Rolling data by %d bins" %(-1*shift)
             comp_rms = find_rms(data,nbins)
 
             if meth is None:
@@ -564,7 +564,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 print 'Estimated SNR (from model peak and data rms): %.2f' % comp_SNR_model
             comp_SNR =  find_peaksnr_smooth(data,comp_rms)
             print 'Estimated SNR (from data peak and rms): %.2f' % comp_SNR
-            print 'Channel Tau (ms): %.2f \pm %.2f bins' %(besttau,taustd)
+            print 'Channel Tau (bins): %.2f \pm %.2f bins' %(besttau,taustd)
             
            
             obtainedtaus.append(besttau)
@@ -742,7 +742,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
             if verboseTag:
                 for i in range(npch):
                     print "Channel %d" %i
-                    print'Tau (ms): %.2f' %(1000*taussec_highsnr[i])
+                    print'Tau (ms): %.2f \pm %.2f' %(1000*taussec_highsnr[i], 1000*lmfitstdssec_highsnr[i])
                     tau1GHz = tauatfreq(freqMHz_highsnr[i]/1000.,taussec_highsnr[i],1.0,4)
                     print 'tau1GHz_alpha_4 (ms) ~ %.4f' %(tau1GHz*1000)
 
