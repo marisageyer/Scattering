@@ -1,4 +1,6 @@
+.ipynb_checkpoints/
 *.png
+*.pyc
 otherversions/
 Calibrated_ArticleData/
 Git_Ignore/
