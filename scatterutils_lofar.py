@@ -329,18 +329,18 @@ def tau_fitter(data,nbins, verbose=True):
     model = Model(modelname)
                  
     model.set_param_hint('nbins', value=nbins, vary=False)            
-    model.set_param_hint('sigma', value=15, vary=True, min =0, max = nbins)
-    model.set_param_hint('mu', value=binpeak, vary=True, min=0, max = nbins)
+    model.set_param_hint('sigma', value=15, vary=True, min=0, max=nbins)
+    model.set_param_hint('mu', value=binpeak, vary=True, min=0, max=nbins)
     model.set_param_hint('A',value=profile_peak, vary=True, min=0)
     model.set_param_hint('tau',value=200, vary=True, min=0)
-    model.set_param_hint('dc',value = 0, vary = True)
+    model.set_param_hint('dc',value=0, vary=True)
     pars = model.make_params()
     xax=np.linspace(1,nbins,nbins)
 
     #"""Fit data"""
     result = model.fit(data,pars,x=xax)
     if verbose == True:
-        print(result.fit_report(show_correl = True))
+        print(result.fit_report(show_correl=True))
     else:
         print "To see fit report, use verbose=True"
     
@@ -377,16 +377,15 @@ def tau_fitter(data,nbins, verbose=True):
 
 def tau_fitter_guess(data,nbins,mu_guess, sigma_guess,tau_guess,verbose=True):
     profile_peak = np.max(data)
-    #binpeak = np.argmax(data)
     modelname = GxETrain
     model = Model(modelname)
 
     model.set_param_hint('nbins', value=nbins, vary=False)
-    model.set_param_hint('sigma', value=sigma_guess, vary=True, min =0, max = nbins)
-    model.set_param_hint('mu', value=mu_guess, vary=True, min=0, max = nbins)
+    model.set_param_hint('sigma', value=sigma_guess, vary=True, min=0, max=nbins)
+    model.set_param_hint('mu', value=mu_guess, vary=True, min=0, max=nbins)
     model.set_param_hint('A',value=profile_peak, vary=True, min=0)
     model.set_param_hint('tau',value=tau_guess, vary=True, min=0)
-    model.set_param_hint('dc',value = 0, vary = True)
+    model.set_param_hint('dc',value=0, vary=True)
     pars = model.make_params()
     xax=np.linspace(1,nbins,nbins)
 
@@ -439,18 +438,18 @@ def tau_1D_fitter(data,nbins,verbose=True):
     model = Model(modelname)
 
     model.set_param_hint('nbins', value=nbins, vary=False)
-    model.set_param_hint('sigma', value=15, vary=True, min =0, max = nbins)
-    model.set_param_hint('mu', value=binpeak, vary=True, min=0, max = nbins)
+    model.set_param_hint('sigma', value=15, vary=True, min=0, max=nbins)
+    model.set_param_hint('mu', value=binpeak, vary=True, min=0, max=nbins)
     model.set_param_hint('A',value=profile_peak, vary=True,min=0)
     model.set_param_hint('tau1',value=200, vary=True, min=0)
 #    model.set_param_hint('tau1',value=166.792877, vary=False)
-    model.set_param_hint('dc',value = 0, vary = True)
+    model.set_param_hint('dc',value=0, vary=True)
     pars = model.make_params()
 
     result = model.fit(data,pars,x=np.linspace(1,nbins,nbins))
 
     if verbose == True:
-        print(result.fit_report(show_correl = True))
+        print(result.fit_report(show_correl=True))
     else:
         print "To see fit report, use verbose=True"
 
@@ -565,7 +564,7 @@ def produce_taufits(filepath,meth='iso',pulseperiod=None,snr_cut=None,
                 print 'Estimated SNR (from model peak and data rms): %.2f' % comp_SNR_model
             comp_SNR =  find_peaksnr_smooth(data,comp_rms)
             print 'Estimated SNR (from data peak and rms): %.2f' % comp_SNR
-            print 'Channel Tau (ms): %.2f \pm %.2f ms' %(besttau,taustd)
+            print 'Channel Tau (ms): %.2f \pm %.2f bins' %(besttau,taustd)
             
            
             obtainedtaus.append(besttau)
@@ -1023,7 +1022,7 @@ def produce_tauspectrum(freqMHz,taus,tauserr,log=True, plotspecevo=False,
             ax.set_xlabel(r'$\nu$ (MHz)',fontsize=22, labelpad=15.0)
             
             
-            #ax.set_xlim(xmin = 0.95*freqMHz[0],xmax=1.05*freqMHz[-1])
+            #ax.set_xlim(xmin=0.95*freqMHz[0],xmax=1.05*freqMHz[-1])
     
 
             if savefigure == True:
@@ -1110,7 +1109,7 @@ def produce_tauspectrum_highHBA(freqMHz,taus,tauserr,freqMHzhigh,tauhigh,tauerrh
     plt.legend(fontsize=12,numpoints=None)
     plt.xlabel(r'$\nu$ (MHz)',fontsize=14, labelpad=15.0)
     plt.ylabel(r'$\tau$ (sec)',fontsize=14)
-    plt.xlim(xmin = 0.95*freqMHz[0],xmax=1.05*freqMHzhigh[-1])
+    plt.xlim(xmin=0.95*freqMHz[0],xmax=1.05*freqMHzhigh[-1])
     plt.gcf().subplots_adjust(bottom=0.15)
     
     return freqMHZ, alpha, alphaerr, fit, fithigh

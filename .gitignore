@@ -1,5 +1,6 @@
 *.png
-Calibrated_ArticleData
-Git_Ignore
-FitTxtfiles
-Spectraplots
+otherversions/
+Calibrated_ArticleData/
+Git_Ignore/
+FitTxtfiles/
+Spectraplots/
